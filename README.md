@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TBH-IMS — Tams Beauty Hub Inventory Management System
 
-## Getting Started
+Phase 1 foundation for the TBH-IMS platform (see `TAMS_IMS_SDD_v2_NextJS_Turso.md`).
 
-First, run the development server:
+**Stack:** Next.js 14 · Turso (libSQL) · Drizzle ORM · Auth.js
+
+## Phase 1 progress
+
+### Week 1 (complete)
+- [x] Next.js 14 App Router + Tailwind CSS + shadcn/ui components
+- [x] Drizzle schema + Turso/libSQL + migrations
+- [x] Auth.js credentials login with role-based middleware
+- [x] Dashboard shell with mobile-first navigation
+- [x] Seed script (owner user, chart of accounts, default categories)
+
+### Weeks 2–4 (complete)
+- [x] Product CRUD server actions + list, add, and edit screens
+- [x] Category management with business unit filter (thrift / nails)
+- [x] Stock adjustment with reason logging (`stock_movements` table)
+- [x] Low-stock flagging in product list and dashboard
+
+### Weeks 5–7 (complete)
+- [x] POS screen — product selector, cart, payment method, discount
+- [x] `createSale()` — atomic order + stock + journal entries
+- [x] Digital receipt modal with WhatsApp share
+- [x] Sales history with date filter and pagination
+- [x] Sale detail / receipt view at `/sales/[id]`
+
+### Week 8 (in progress)
+- [x] CSV bulk stock import (`/inventory/import`)
+- [x] Coming-soon pages for Appointments, Settings, and Ledger nav links
+- [x] POS stock counts refresh after each sale
+- [ ] End-to-end testing and go-live prep
+
+## Getting started
 
 ```bash
+cp .env.example .env
+# Set AUTH_SECRET: openssl rand -base64 32
+
+npm install
+npm run db:migrate
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and sign in with:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Email:** `owner@tamsbeautyhub.com`
+- **Password:** `changeme123` (change via `SEED_OWNER_PASSWORD` before seeding)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Database commands
 
-## Learn More
+| Command | Description |
+|---------|-------------|
+| `npm run db:generate` | Generate migration from schema changes |
+| `npm run db:migrate` | Apply migrations |
+| `npm run db:seed` | Seed owner, COA, categories |
+| `npm run db:studio` | Open Drizzle Studio |
 
-To learn more about Next.js, take a look at the following resources:
+## Turso (production)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create databases at [turso.tech](https://turso.tech)
+2. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in Vercel env vars
+3. Set `AUTH_SECRET` and `AUTH_URL` for Auth.js
+4. Deploy — migrations run via `postbuild` script
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Next up (Phase 1 Week 8)
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- End-to-end testing of inventory and POS flows
+- Go-live preparation (production Turso + Vercel)

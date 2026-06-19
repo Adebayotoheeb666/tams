@@ -1,0 +1,33 @@
+export const CHART_OF_ACCOUNTS = [
+  { code: "1000", name: "Cash — On Hand", type: "asset" as const, normalBalance: "debit" as const },
+  { code: "1010", name: "Bank Account — GTBank", type: "asset" as const, normalBalance: "debit" as const },
+  { code: "1100", name: "Accounts Receivable", type: "asset" as const, normalBalance: "debit" as const },
+  { code: "1200", name: "Thrift Inventory", type: "asset" as const, normalBalance: "debit" as const },
+  { code: "1210", name: "Nail Supplies Inventory", type: "asset" as const, normalBalance: "debit" as const },
+  { code: "1300", name: "Prepaid Expenses", type: "asset" as const, normalBalance: "debit" as const },
+  { code: "2000", name: "Accounts Payable", type: "liability" as const, normalBalance: "credit" as const },
+  { code: "2100", name: "VAT Payable", type: "liability" as const, normalBalance: "credit" as const },
+  { code: "2200", name: "Accrued Expenses", type: "liability" as const, normalBalance: "credit" as const },
+  { code: "3000", name: "Owner's Equity / Capital", type: "equity" as const, normalBalance: "credit" as const },
+  { code: "3100", name: "Retained Earnings", type: "equity" as const, normalBalance: "credit" as const },
+  { code: "3200", name: "Owner's Drawings", type: "equity" as const, normalBalance: "debit" as const },
+  { code: "4000", name: "Thrift Sales Revenue", type: "income" as const, normalBalance: "credit" as const },
+  { code: "4100", name: "Nail Services Revenue", type: "income" as const, normalBalance: "credit" as const },
+  { code: "4200", name: "Other Income", type: "income" as const, normalBalance: "credit" as const },
+  { code: "5000", name: "Cost of Goods Sold — Thrift", type: "cogs" as const, normalBalance: "debit" as const },
+  { code: "5100", name: "Nail Supplies Consumed", type: "cogs" as const, normalBalance: "debit" as const },
+  { code: "6000", name: "Rent & Utilities", type: "expense" as const, normalBalance: "debit" as const },
+  { code: "6100", name: "Transport & Delivery", type: "expense" as const, normalBalance: "debit" as const },
+  { code: "6200", name: "Marketing & Advertising", type: "expense" as const, normalBalance: "debit" as const },
+  { code: "6300", name: "Packaging & Supplies", type: "expense" as const, normalBalance: "debit" as const },
+  { code: "6400", name: "Platform & Software Fees", type: "expense" as const, normalBalance: "debit" as const },
+  { code: "6500", name: "Miscellaneous Expenses", type: "expense" as const, normalBalance: "debit" as const },
+] as const;
+
+export const DEFAULT_CATEGORIES = [
+  { name: "Corporate Shirts", businessUnit: "thrift" as const },
+  { name: "Tops & Crop Tops", businessUnit: "thrift" as const },
+  { name: "Shorts & Bottoms", businessUnit: "thrift" as const },
+  { name: "Press-On Nails", businessUnit: "nails" as const },
+  { name: "Nail Supplies", businessUnit: "nails" as const },
+] as const;
