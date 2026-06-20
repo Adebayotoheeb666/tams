@@ -6,6 +6,7 @@ import { z } from "zod";
 import { authConfig } from "@/auth.config";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { auditLogs } from "@/lib/db/schema";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -41,6 +42,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!valid) {
           return null;
         }
+
+        try {
+          await db.insert(auditLogs).values({ id: crypto.randomUUID(), eventType: "login.success", userId: user.id, payload: JSON.stringify({ email }), ip: null, createdAt: new Date().toISOString() });
+        } catch {}
 
         return {
           id: user.id,

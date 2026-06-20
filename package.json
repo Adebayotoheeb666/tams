@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -29,8 +30,15 @@
     "react-dom": "^18",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
+    ,
+    "cloudinary": "^2.0.0"
+    ,
+    "@react-pdf/renderer": "^3.0.0",
+    "exceljs": "^4.3.0"
   },
   "devDependencies": {
+    "vitest": "^1.0.0",
+    "@testing-library/react": "^14.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^18",

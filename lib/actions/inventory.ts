@@ -314,6 +314,9 @@ export async function adjustStock(
 ): Promise<ActionResult<Product>> {
   const session = await requireInventoryAccess();
 
+  // period lock check
+  const { isPeriodLocked } = await import("@/lib/actions/bookkeeping");
+
   const parsed = adjustStockSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -338,6 +341,9 @@ export async function adjustStock(
   }
 
   const now = nowIso();
+  if (await isPeriodLocked(now)) {
+    return { success: false, error: "Accounting period is locked" };
+  }
 
   await db.transaction(async (tx) => {
     await tx
@@ -385,6 +391,12 @@ export async function importProductsFromCsv(
   const session = await requireInventoryAccess();
   if (session.user.role !== "owner") {
     return { success: false, error: "Only the owner can import products from CSV" };
+  }
+
+  const { isPeriodLocked } = await import("@/lib/actions/bookkeeping");
+  // block import if current period locked
+  if (await isPeriodLocked(nowIso())) {
+    return { success: false, error: "Accounting period is locked" };
   }
 
   const { rows, errors: parseErrors } = parseProductsCsv(csvText);

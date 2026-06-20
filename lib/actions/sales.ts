@@ -26,6 +26,7 @@ import {
   salesHistorySchema,
 } from "@/lib/validations/sales";
 import { nairaToKobo, nowIso, todayDateString, type BusinessUnit } from "@/lib/utils";
+import { isPeriodLocked, logAudit } from "@/lib/actions/bookkeeping";
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -191,6 +192,10 @@ export async function createSale(
   const entryDate = todayDateString();
 
   try {
+    if (await isPeriodLocked(entryDate)) {
+      return { success: false, error: "Accounting period is locked" };
+    }
+
     const result = await db.transaction(async (tx) => {
       const receiptNumber = await nextReceiptNumber(tx);
       const orderId = crypto.randomUUID();
@@ -369,6 +374,10 @@ export async function createSale(
       },
     };
   } catch (error) {
+    // audit failure
+    try {
+      await logAudit("sale.error", session?.user?.id ?? null, { error: error instanceof Error ? error.message : String(error) });
+    } catch {}
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to complete sale",

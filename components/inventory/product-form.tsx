@@ -29,12 +29,37 @@ export function ProductForm({ categories, product, mode }: ProductFormProps) {
     (c) => c.businessUnit === businessUnit,
   );
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
     const formData = new FormData(event.currentTarget);
     const businessUnit = String(formData.get("businessUnit"));
+
+    // handle image upload if a file was provided
+    let imageUrl = product?.imageUrl ?? "";
+    const file = formData.get("image") as File | null;
+    if (file && file.size > 0) {
+      try {
+        const uploadFd = new FormData();
+        uploadFd.append("file", file);
+        const res = await fetch("/api/uploads", {
+          method: "POST",
+          body: uploadFd,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          setError(text || "Image upload failed");
+          return;
+        }
+        const json = await res.json();
+        imageUrl = json.url;
+      } catch (e: any) {
+        setError(e?.message ?? "Image upload failed");
+        return;
+      }
+    }
+
     const payload = {
       name: String(formData.get("name")),
       sku: String(formData.get("sku")),
@@ -44,7 +69,7 @@ export function ProductForm({ categories, product, mode }: ProductFormProps) {
       costPriceNaira: Number(formData.get("costPriceNaira")),
       sellingPriceNaira: Number(formData.get("sellingPriceNaira")),
       reorderLevel: Number(formData.get("reorderLevel")),
-      imageUrl: String(formData.get("imageUrl") || ""),
+      imageUrl: imageUrl || "",
       ...(mode === "create"
         ? { quantity: Number(formData.get("quantity") ?? 0) }
         : { id: product!.id }),
@@ -170,14 +195,8 @@ export function ProductForm({ categories, product, mode }: ProductFormProps) {
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="imageUrl">Image URL (optional)</Label>
-          <Input
-            id="imageUrl"
-            name="imageUrl"
-            type="url"
-            placeholder="https://..."
-            defaultValue={product?.imageUrl ?? ""}
-          />
+          <Label htmlFor="image">Image (optional)</Label>
+          <Input id="image" name="image" type="file" accept="image/*" />
         </div>
 
         <div className="space-y-2 sm:col-span-2">

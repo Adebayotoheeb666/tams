@@ -10,6 +10,7 @@ import {
 import { ledgerFilterSchema } from "@/lib/validations/appointments";
 import { and, asc, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import type { UserRole } from "@/lib/db/schema";
+import { periodLocks, auditLogs } from "@/lib/db/schema";
 
 export type LedgerLine = {
   id: string;
@@ -87,22 +88,67 @@ export async function getLedger(input: unknown = {}) {
     db
       .select({ value: count() })
       .from(journalEntryLines)
-      .innerJoin(
-        journalEntries,
-        eq(journalEntryLines.journalEntryId, journalEntries.id),
-      )
+      .innerJoin(journalEntries, eq(journalEntryLines.journalEntryId, journalEntries.id))
       .where(whereClause),
   ]);
 
   const total = totalResult[0]?.value ?? 0;
 
   return {
-    lines: rows as LedgerLine[],
+    rows,
     total,
     page,
     limit,
     totalPages: Math.ceil(total / limit),
   };
+}
+
+export async function isPeriodLocked(dateIso?: string) {
+  if (!dateIso) return false;
+  const y = Number(dateIso.slice(0, 4));
+  const m = Number(dateIso.slice(5, 7));
+  const rows = await db.query.periodLocks.findMany({
+    where: and(periodLocks.year.eq(y), periodLocks.month.eq(m)),
+  });
+  return rows.length > 0;
+}
+
+export async function lockPeriod(input: unknown) {
+  const session = await requireFinanceAccess();
+
+  const payload = typeof input === "object" && input !== null ? input as Record<string, unknown> : {};
+  const year = Number(payload.year);
+  const month = Number(payload.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return { success: false, error: "Invalid year or month" } as const;
+  }
+
+  const existing = await db.query.periodLocks.findFirst({
+    where: and(periodLocks.year.eq(year), periodLocks.month.eq(month)),
+  });
+  if (existing) {
+    return { success: false, error: "Period already locked" } as const;
+  }
+
+  await db.insert(periodLocks).values({
+    id: crypto.randomUUID(),
+    year,
+    month,
+    lockedBy: session.user.id,
+    createdAt: new Date().toISOString(),
+  });
+  return { success: true, data: { year, month } } as const;
+}
+
+export async function logAudit(eventType: string, userId: string | null, payload?: unknown, ip?: string) {
+  await db.insert(auditLogs).values({
+    id: crypto.randomUUID(),
+    eventType,
+    userId: userId ?? null,
+    payload: payload ? JSON.stringify(payload) : null,
+    ip: ip ?? null,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 export async function getAccountSummary() {

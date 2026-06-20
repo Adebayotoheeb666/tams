@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { createSale, getPosProducts, type PosProduct } from "@/lib/actions/sales";
+import { enqueue, getAll, remove as removeQueued } from "@/lib/offline/queue";
 import type { PaymentMethod } from "@/lib/validations/sales";
 import type { SaleReceipt } from "@/lib/sales/receipt";
 import { ReceiptModal } from "@/components/sales/receipt-modal";
@@ -119,6 +120,36 @@ export function PosScreen({ products: initialProducts }: { products: PosProduct[
     await refreshProducts();
   }
 
+  useEffect(() => {
+    async function tryFlushPending() {
+      try {
+        const list: any[] = (await getAll()) as any[];
+        for (const row of list) {
+          try {
+            const res = await createSale(row.item);
+            if (res.success) {
+              await removeQueued(row.id);
+            }
+          } catch {}
+        }
+        await refreshProducts();
+      } catch {}
+    }
+
+    // register service worker and sync if available
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(async (reg) => {
+        try {
+          if ('sync' in reg) await reg.sync.register('tbh-sync');
+        } catch {}
+      });
+    }
+
+    window.addEventListener('online', tryFlushPending);
+    void tryFlushPending();
+    return () => window.removeEventListener('online', tryFlushPending);
+  }, [refreshProducts]);
+
   function handleConfirmSale() {
     setError(null);
 
@@ -143,6 +174,16 @@ export function PosScreen({ products: initialProducts }: { products: PosProduct[
       });
 
       if (!result.success) {
+        try {
+          await enqueue({ action: 'createSale', payload: { items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })), paymentMethod, discountNaira } });
+          // attempt to register sync
+          if ('serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.ready;
+            if ('sync' in reg) {
+              try { await reg.sync.register('tbh-sync'); } catch {}
+            }
+          }
+        } catch {}
         setError(result.error);
         return;
       }

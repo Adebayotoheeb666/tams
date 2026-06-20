@@ -48,6 +48,39 @@ export const customers = sqliteTable("customers", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const suppliers = sqliteTable("suppliers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const purchaseOrders = sqliteTable("purchase_orders", {
+  id: text("id").primaryKey(),
+  orderNumber: text("order_number").notNull().unique(),
+  supplierId: text("supplier_id").references(() => suppliers.id),
+  orderDate: text("order_date").notNull(),
+  totalAmount: integer("total_amount").notNull().default(0),
+  status: text("status", { enum: ["pending", "received", "cancelled"] }).notNull().default("pending"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const purchaseOrderLines = sqliteTable("purchase_order_lines", {
+  id: text("id").primaryKey(),
+  purchaseOrderId: text("purchase_order_id").notNull().references(() => purchaseOrders.id),
+  productId: text("product_id").references(() => products.id),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: integer("unit_price").notNull(),
+  totalPrice: integer("total_price").notNull(),
+});
+
 export const orders = sqliteTable("orders", {
   id: text("id").primaryKey(),
   receiptNumber: text("receipt_number").notNull().unique(),
@@ -202,6 +235,29 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
 }));
 
+export const suppliersRelations = relations(suppliers, ({ many }) => ({
+  purchaseOrders: many(purchaseOrders),
+}));
+
+export const purchaseOrdersRelations = relations(purchaseOrders, ({ one, many }) => ({
+  supplier: one(suppliers, {
+    fields: [purchaseOrders.supplierId],
+    references: [suppliers.id],
+  }),
+  lines: many(purchaseOrderLines),
+}));
+
+export const purchaseOrderLinesRelations = relations(purchaseOrderLines, ({ one }) => ({
+  purchaseOrder: one(purchaseOrders, {
+    fields: [purchaseOrderLines.purchaseOrderId],
+    references: [purchaseOrders.id],
+  }),
+  product: one(products, {
+    fields: [purchaseOrderLines.productId],
+    references: [products.id],
+  }),
+}));
+
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, {
     fields: [orderItems.orderId],
@@ -275,3 +331,46 @@ export type Service = typeof services.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
 export type AppointmentStatus = Appointment["status"];
 export type UserRole = User["role"];
+export type Supplier = typeof suppliers.$inferSelect;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type PurchaseOrderLine = typeof purchaseOrderLines.$inferSelect;
+
+export const exportJobs = sqliteTable("export_jobs", {
+  id: text("id").primaryKey(),
+  jobType: text("job_type").notNull(),
+  status: text("status", { enum: ["pending", "running", "completed", "failed"] }).notNull().default("pending"),
+  params: text("params"),
+  fileUrl: text("file_url"),
+  resultMessage: text("result_message"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const exportJobsRelations = relations(exportJobs, ({}) => ({}));
+
+export type ExportJob = typeof exportJobs.$inferSelect;
+
+export const periodLocks = sqliteTable("period_locks", {
+  id: text("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  lockedBy: text("locked_by").notNull().references(() => users.id),
+  createdAt: text("created_at").notNull(),
+});
+
+export const periodLocksRelations = relations(periodLocks, ({ one }) => ({
+  user: one(users, { fields: [periodLocks.lockedBy], references: [users.id] }),
+}));
+
+export const auditLogs = sqliteTable("audit_logs", {
+  id: text("id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  userId: text("user_id").references(() => users.id),
+  payload: text("payload"),
+  ip: text("ip"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+}));

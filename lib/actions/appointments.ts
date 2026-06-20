@@ -19,6 +19,7 @@ import {
 import { addMinutesToTime, nowIso, todayDateString } from "@/lib/utils";
 import { and, asc, count, eq, gte, inArray, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { isPeriodLocked } from "@/lib/actions/bookkeeping";
 
 type ActionResult<T> =
   | { success: true; data: T }
@@ -228,6 +229,10 @@ export async function updateAppointmentStatus(
   }
 
   if (status === "completed" && appointment.status !== "completed") {
+    if (await isPeriodLocked(todayDateString())) {
+      return { success: false, error: "Accounting period is locked" };
+    }
+
     await db.transaction(async (tx) => {
       await tx
         .update(appointments)
