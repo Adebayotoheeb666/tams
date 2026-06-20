@@ -15,12 +15,14 @@ export default async function PurchaseOrderPage({ params }: { params: { id: stri
 
   if (!po) return <p>Not found</p>;
 
+  const purchaseOrderId = po.id;
+
   async function markReceived() {
-    await receivePurchaseOrder({ id: po.id });
+    await receivePurchaseOrder({ id: purchaseOrderId });
   }
 
   async function cancelOrder() {
-    await cancelPurchaseOrder(po.id);
+    await cancelPurchaseOrder(purchaseOrderId);
   }
 
   return (
@@ -86,7 +88,7 @@ export default async function PurchaseOrderPage({ params }: { params: { id: stri
               suppliers={suppliers}
               submitLabel="Save changes"
               initialData={{
-                supplierId: po.supplierId,
+                supplierId: po.supplierId ?? "",
                 orderDate: po.orderDate,
                 lines: po.lines.map((l) => ({
                   productId: l.productId ?? undefined,

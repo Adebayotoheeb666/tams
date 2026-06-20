@@ -17,7 +17,7 @@ export default async function PnlPage({ searchParams }: { searchParams: SearchPa
   const { from, to, compareFrom, compareTo } = searchParams;
   const statement = await computePnL({ from, to, compareFrom, compareTo });
 
-  async function exportPdf(formData: FormData) {
+  async function exportPdf() {
     await exportStatement({
       type: "pdf",
       from: from ?? undefined,
@@ -26,7 +26,7 @@ export default async function PnlPage({ searchParams }: { searchParams: SearchPa
     });
   }
 
-  async function exportExcel(formData: FormData) {
+  async function exportExcel() {
     await exportStatement({
       type: "excel",
       from: from ?? undefined,

@@ -10,6 +10,7 @@ import {
   bulkReceivePurchaseOrdersSchema,
 } from "@/lib/validations/procurement";
 import { nowIso, nairaToKobo } from "@/lib/utils";
+import { desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 type ActionResult<T> =
@@ -25,12 +26,12 @@ async function requireProcurementAccess() {
 
 export async function getPurchaseOrders() {
   await requireProcurementAccess();
-  return db.query.purchaseOrders.findMany({ with: { supplier: true }, orderBy: [purchaseOrders.createdAt.desc()] });
+  return db.query.purchaseOrders.findMany({ with: { supplier: true }, orderBy: [desc(purchaseOrders.createdAt)] });
 }
 
 export async function getPurchaseOrderById(id: string) {
   await requireProcurementAccess();
-  return db.query.purchaseOrders.findFirst({ where: purchaseOrders.id.eq(id), with: { lines: true, supplier: true } }) ?? null;
+  return db.query.purchaseOrders.findFirst({ where: eq(purchaseOrders.id, id), with: { lines: true, supplier: true } }) ?? null;
 }
 
 export async function createPurchaseOrder(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -79,7 +80,7 @@ export async function receivePurchaseOrder(input: unknown): Promise<ActionResult
   const parsed = receivePurchaseOrderSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const po = await db.query.purchaseOrders.findFirst({ where: purchaseOrders.id.eq(parsed.data.id), with: { lines: true } });
+  const po = await db.query.purchaseOrders.findFirst({ where: eq(purchaseOrders.id, parsed.data.id), with: { lines: true } });
   if (!po) return { success: false, error: "Purchase order not found" };
   if (po.status === "received") return { success: false, error: "Already received" };
 
@@ -92,15 +93,15 @@ export async function receivePurchaseOrder(input: unknown): Promise<ActionResult
   const userId = session?.user?.id ?? "";
 
   await db.transaction(async (tx) => {
-    await tx.update(purchaseOrders).set({ status: "received", updatedAt: now }).where(purchaseOrders.id.eq(po.id));
+    await tx.update(purchaseOrders).set({ status: "received", updatedAt: now }).where(eq(purchaseOrders.id, po.id));
 
     for (const line of po.lines) {
       if (!line.productId) continue;
-      const product = await tx.query.products.findFirst({ where: products.id.eq(line.productId) });
+      const product = await tx.query.products.findFirst({ where: eq(products.id, line.productId) });
       const before = product ? product.quantity : 0;
       const after = before + line.quantity;
 
-      await tx.update(products).set({ quantity: after, updatedAt: now }).where(products.id.eq(line.productId));
+      await tx.update(products).set({ quantity: after, updatedAt: now }).where(eq(products.id, line.productId));
 
       await tx.insert(stockMovements).values({
         id: crypto.randomUUID(),
@@ -127,7 +128,7 @@ export async function updatePurchaseOrder(input: unknown): Promise<ActionResult<
   const parsed = updatePurchaseOrderSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const po = await db.query.purchaseOrders.findFirst({ where: purchaseOrders.id.eq(parsed.data.id), with: { lines: true } });
+  const po = await db.query.purchaseOrders.findFirst({ where: eq(purchaseOrders.id, parsed.data.id), with: { lines: true } });
   if (!po) return { success: false, error: "Purchase order not found" };
   if (po.status !== "pending") return { success: false, error: "Only pending orders can be updated" };
 
@@ -140,9 +141,9 @@ export async function updatePurchaseOrder(input: unknown): Promise<ActionResult<
       orderDate: parsed.data.orderDate,
       totalAmount: total,
       updatedAt: now,
-    }).where(purchaseOrders.id.eq(parsed.data.id));
+    }).where(eq(purchaseOrders.id, parsed.data.id));
 
-    await tx.delete(purchaseOrderLines).where(purchaseOrderLines.purchaseOrderId.eq(parsed.data.id));
+    await tx.delete(purchaseOrderLines).where(eq(purchaseOrderLines.purchaseOrderId, parsed.data.id));
 
     for (const line of parsed.data.lines) {
       await tx.insert(purchaseOrderLines).values({
@@ -165,12 +166,12 @@ export async function updatePurchaseOrder(input: unknown): Promise<ActionResult<
 export async function cancelPurchaseOrder(id: string): Promise<ActionResult<{ id: string }>> {
   await requireProcurementAccess();
 
-  const po = await db.query.purchaseOrders.findFirst({ where: purchaseOrders.id.eq(id) });
+  const po = await db.query.purchaseOrders.findFirst({ where: eq(purchaseOrders.id, id) });
   if (!po) return { success: false, error: "Purchase order not found" };
   if (po.status === "received") return { success: false, error: "Cannot cancel a received order" };
   if (po.status === "cancelled") return { success: false, error: "Purchase order is already cancelled" };
 
-  await db.update(purchaseOrders).set({ status: "cancelled", updatedAt: nowIso() }).where(purchaseOrders.id.eq(id));
+  await db.update(purchaseOrders).set({ status: "cancelled", updatedAt: nowIso() }).where(eq(purchaseOrders.id, id));
   revalidatePath("/procurement");
 
   return { success: true, data: { id } };
@@ -188,7 +189,7 @@ export async function bulkReceivePurchaseOrders(input: unknown): Promise<ActionR
     return { success: false, error: "Accounting period is locked" };
   }
   const rawOrders = await db.query.purchaseOrders.findMany({
-    where: purchaseOrders.id.in(parsed.data.ids),
+    where: inArray(purchaseOrders.id, parsed.data.ids),
     with: { lines: true },
   });
 
@@ -200,15 +201,15 @@ export async function bulkReceivePurchaseOrders(input: unknown): Promise<ActionR
 
   await db.transaction(async (tx) => {
     for (const po of pendingOrders) {
-      await tx.update(purchaseOrders).set({ status: "received", updatedAt: now }).where(purchaseOrders.id.eq(po.id));
+      await tx.update(purchaseOrders).set({ status: "received", updatedAt: now }).where(eq(purchaseOrders.id, po.id));
 
       for (const line of po.lines) {
         if (!line.productId) continue;
-        const product = await tx.query.products.findFirst({ where: products.id.eq(line.productId) });
+        const product = await tx.query.products.findFirst({ where: eq(products.id, line.productId) });
         const before = product ? product.quantity : 0;
         const after = before + line.quantity;
 
-        await tx.update(products).set({ quantity: after, updatedAt: now }).where(products.id.eq(line.productId));
+        await tx.update(products).set({ quantity: after, updatedAt: now }).where(eq(products.id, line.productId));
 
         await tx.insert(stockMovements).values({
           id: crypto.randomUUID(),

@@ -8,6 +8,7 @@ import {
   updateSupplierSchema,
 } from "@/lib/validations/suppliers";
 import { nowIso } from "@/lib/utils";
+import { asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 type ActionResult<T> =
@@ -28,14 +29,14 @@ async function requireInventoryAccess() {
 export async function getSuppliers() {
   await requireInventoryAccess();
   return db.query.suppliers.findMany({
-    where: suppliers.isActive.eq(1),
-    orderBy: [suppliers.name.asc()],
+    where: eq(suppliers.isActive, 1),
+    orderBy: [asc(suppliers.name)],
   });
 }
 
 export async function getSupplierById(id: string) {
   await requireInventoryAccess();
-  const s = await db.query.suppliers.findFirst({ where: suppliers.id.eq(id) });
+  const s = await db.query.suppliers.findFirst({ where: eq(suppliers.id, id) });
   return s ?? null;
 }
 
@@ -76,7 +77,7 @@ export async function updateSupplier(input: unknown): Promise<ActionResult<{ id:
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const existing = await db.query.suppliers.findFirst({ where: suppliers.id.eq(parsed.data.id) });
+  const existing = await db.query.suppliers.findFirst({ where: eq(suppliers.id, parsed.data.id) });
   if (!existing) {
     return { success: false, error: "Supplier not found" };
   }
@@ -88,7 +89,7 @@ export async function updateSupplier(input: unknown): Promise<ActionResult<{ id:
     email: parsed.data.email || null,
     address: parsed.data.address || null,
     updatedAt: nowIso(),
-  }).where(suppliers.id.eq(parsed.data.id));
+  }).where(eq(suppliers.id, parsed.data.id));
 
   revalidatePath("/suppliers");
 
@@ -101,12 +102,12 @@ export async function archiveSupplier(id: string): Promise<ActionResult<{ id: st
     return { success: false, error: "Only the owner can archive suppliers" };
   }
 
-  const existing = await db.query.suppliers.findFirst({ where: suppliers.id.eq(id) });
+  const existing = await db.query.suppliers.findFirst({ where: eq(suppliers.id, id) });
   if (!existing) {
     return { success: false, error: "Supplier not found" };
   }
 
-  await db.update(suppliers).set({ isActive: 0, updatedAt: nowIso() }).where(suppliers.id.eq(id));
+  await db.update(suppliers).set({ isActive: 0, updatedAt: nowIso() }).where(eq(suppliers.id, id));
 
   revalidatePath("/suppliers");
 

@@ -95,7 +95,7 @@ export async function getLedger(input: unknown = {}) {
   const total = totalResult[0]?.value ?? 0;
 
   return {
-    rows,
+    lines: rows,
     total,
     page,
     limit,
@@ -108,7 +108,7 @@ export async function isPeriodLocked(dateIso?: string) {
   const y = Number(dateIso.slice(0, 4));
   const m = Number(dateIso.slice(5, 7));
   const rows = await db.query.periodLocks.findMany({
-    where: and(periodLocks.year.eq(y), periodLocks.month.eq(m)),
+    where: and(eq(periodLocks.year, y), eq(periodLocks.month, m)),
   });
   return rows.length > 0;
 }
@@ -124,7 +124,7 @@ export async function lockPeriod(input: unknown) {
   }
 
   const existing = await db.query.periodLocks.findFirst({
-    where: and(periodLocks.year.eq(year), periodLocks.month.eq(month)),
+    where: and(eq(periodLocks.year, year), eq(periodLocks.month, month)),
   });
   if (existing) {
     return { success: false, error: "Period already locked" } as const;

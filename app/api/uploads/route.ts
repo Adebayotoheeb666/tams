@@ -10,15 +10,15 @@ cloudinary.config({
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const file = formData.get("file") as unknown as File;
-    if (!file || typeof file === "string") {
+    const file = formData.get("file");
+    if (!file || typeof file === "string" || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString("base64");
-    const mime = (file as any).type || "application/octet-stream";
+    const mime = file.type || "application/octet-stream";
     const dataUri = `data:${mime};base64,${base64}`;
 
     const uploadResult = await cloudinary.uploader.upload(dataUri, {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ url: uploadResult.secure_url });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? String(err) }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@
 const DB_NAME = 'tbh-offline-queue';
 const STORE = 'queue';
 
-function openDb() {
+function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => {
@@ -14,7 +14,7 @@ function openDb() {
   });
 }
 
-export async function enqueue(item) {
+export async function enqueue(item: unknown): Promise<boolean> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
@@ -25,7 +25,7 @@ export async function enqueue(item) {
   });
 }
 
-export async function getAll() {
+export async function getAll(): Promise<unknown[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
@@ -36,7 +36,7 @@ export async function getAll() {
   });
 }
 
-export async function remove(id) {
+export async function remove(id: string): Promise<boolean> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
@@ -46,7 +46,7 @@ export async function remove(id) {
   });
 }
 
-export async function clearAll() {
+export async function clearAll(): Promise<boolean> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');

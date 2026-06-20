@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Supplier } from "@/lib/db/schema";
+import type { CreateSupplier, UpdateSupplier } from "@/lib/validations/suppliers";
 
 type Props = {
   supplier?: Supplier | null;
@@ -24,15 +25,14 @@ export function SupplierForm({ supplier, mode }: Props) {
     setError(null);
 
     const fd = new FormData(e.currentTarget);
-    const payload: any = {
+    const payload = {
       name: String(fd.get("name") || ""),
       contactName: String(fd.get("contactName") || ""),
       phone: String(fd.get("phone") || ""),
       email: String(fd.get("email") || ""),
       address: String(fd.get("address") || ""),
-    };
-
-    if (mode === "edit") payload.id = supplier!.id;
+      ...(mode === "edit" ? { id: supplier!.id } : {}),
+    } as CreateSupplier | UpdateSupplier;
 
     startTransition(async () => {
       const result = mode === "create" ? await createSupplier(payload) : await updateSupplier(payload);

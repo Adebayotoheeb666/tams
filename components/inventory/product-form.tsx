@@ -54,8 +54,8 @@ export function ProductForm({ categories, product, mode }: ProductFormProps) {
         }
         const json = await res.json();
         imageUrl = json.url;
-      } catch (e: any) {
-        setError(e?.message ?? "Image upload failed");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Image upload failed");
         return;
       }
     }

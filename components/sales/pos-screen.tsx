@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { createSale, getPosProducts, type PosProduct } from "@/lib/actions/sales";
+import type { CreateSaleInput } from "@/lib/validations/sales";
 import { enqueue, getAll, remove as removeQueued } from "@/lib/offline/queue";
 import type { PaymentMethod } from "@/lib/validations/sales";
 import type { SaleReceipt } from "@/lib/sales/receipt";
@@ -120,10 +121,12 @@ export function PosScreen({ products: initialProducts }: { products: PosProduct[
     await refreshProducts();
   }
 
+  type PendingSale = { id: string; item: CreateSaleInput };
+
   useEffect(() => {
     async function tryFlushPending() {
       try {
-        const list: any[] = (await getAll()) as any[];
+        const list = (await getAll()) as PendingSale[];
         for (const row of list) {
           try {
             const res = await createSale(row.item);
@@ -140,7 +143,8 @@ export function PosScreen({ products: initialProducts }: { products: PosProduct[
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then(async (reg) => {
         try {
-          if ('sync' in reg) await reg.sync.register('tbh-sync');
+          const registration = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
+          if (registration.sync) await registration.sync.register('tbh-sync');
         } catch {}
       });
     }
@@ -179,8 +183,9 @@ export function PosScreen({ products: initialProducts }: { products: PosProduct[
           // attempt to register sync
           if ('serviceWorker' in navigator) {
             const reg = await navigator.serviceWorker.ready;
-            if ('sync' in reg) {
-              try { await reg.sync.register('tbh-sync'); } catch {}
+            const registration = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
+            if (registration.sync) {
+              try { await registration.sync.register('tbh-sync'); } catch {}
             }
           }
         } catch {}

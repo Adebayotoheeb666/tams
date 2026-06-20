@@ -14,7 +14,7 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
   const { date } = searchParams;
   const report = await computeBalanceSheet({ date });
 
-  async function exportPdf(formData: FormData) {
+  async function exportPdf() {
     await exportStatement({
       type: "pdf",
       from: date ?? undefined,
@@ -23,7 +23,7 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
     });
   }
 
-  async function exportExcel(formData: FormData) {
+  async function exportExcel() {
     await exportStatement({
       type: "excel",
       from: date ?? undefined,

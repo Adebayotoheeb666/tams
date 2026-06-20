@@ -15,7 +15,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
   const { from, to } = searchParams;
   const statement = await computePnL({ from, to });
 
-  async function exportPdf(formData: FormData) {
+  async function exportPdf() {
     await exportStatement({
       type: "pdf",
       from: from ?? undefined,
@@ -24,7 +24,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
     });
   }
 
-  async function exportExcel(formData: FormData) {
+  async function exportExcel() {
     await exportStatement({
       type: "excel",
       from: from ?? undefined,

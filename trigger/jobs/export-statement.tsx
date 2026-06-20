@@ -1,6 +1,7 @@
 // Trigger.dev job scaffold: generate PDF/Excel and upload to Cloudinary.
 import { db } from "@/lib/db";
 import { exportJobs } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { pdf, Document, Page, Text, StyleSheet } from "@react-pdf/renderer";
 import ExcelJS from "exceljs";
 import cloudinary from "cloudinary";
@@ -63,10 +64,10 @@ function rowsFromParams(params: unknown): Array<ExportRow | unknown> {
 }
 
 export async function exportStatementJob(jobId: string) {
-  const job = await db.query.exportJobs.findFirst({ where: exportJobs.id.eq(jobId) });
+  const job = await db.query.exportJobs.findFirst({ where: eq(exportJobs.id, jobId) });
   if (!job) throw new Error("Job not found");
 
-  await db.update(exportJobs).set({ status: "running", updatedAt: new Date().toISOString() }).where(exportJobs.id.eq(jobId));
+  await db.update(exportJobs).set({ status: "running", updatedAt: new Date().toISOString() }).where(eq(exportJobs.id, jobId));
 
   try {
     const params = job.params ? JSON.parse(job.params) : {};
@@ -102,8 +103,40 @@ export async function exportStatementJob(jobId: string) {
         </Document>
       );
 
-      const buffer = await pdf(doc).toBuffer();
-      const b64 = buffer.toString("base64");
+      const pdfStream = await pdf(doc).toBuffer();
+      const chunks: Uint8Array[] = [];
+      let totalLength = 0;
+
+      const pushChunk = (chunk: ArrayBufferLike | Uint8Array | string) => {
+        const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+        chunks.push(bytes);
+        totalLength += bytes.length;
+      };
+
+      if (typeof (pdfStream as any).getReader === "function") {
+        const reader = (pdfStream as any).getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) pushChunk(value);
+        }
+      } else {
+        await new Promise<void>((resolve, reject) => {
+          const stream = pdfStream as unknown as NodeJS.ReadableStream;
+          stream.on("data", (chunk) => pushChunk(chunk as Uint8Array));
+          stream.on("end", () => resolve());
+          stream.on("error", (error) => reject(error));
+        });
+      }
+
+      const arrayBuffer = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        arrayBuffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const b64 = Buffer.from(arrayBuffer).toString("base64");
       const dataUri = `data:application/pdf;base64,${b64}`;
       const uploaded = await cloudinary.v2.uploader.upload(dataUri, { resource_type: "raw", folder: "exports" });
       fileUrl = uploaded.secure_url;

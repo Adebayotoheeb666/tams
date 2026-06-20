@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { exportJobs } from "@/lib/db/schema";
 
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     fileUrl: fileUrl ?? null,
     resultMessage: message ?? null,
     updatedAt: new Date().toISOString(),
-  }).where(exportJobs.id.eq(jobId));
+  }).where(eq(exportJobs.id, jobId));
 
   return NextResponse.json({ ok: true });
 }
