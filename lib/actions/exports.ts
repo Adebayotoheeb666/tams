@@ -14,17 +14,23 @@ type ActionResult<T> =
 
 async function requireAuth() {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return null;
   return session;
 }
 
 export async function getExportJobs() {
-  await requireAuth();
+  const session = await requireAuth();
+  if (!session) {
+    return [];
+  }
   return db.query.exportJobs.findMany({ orderBy: [desc(exportJobs.createdAt)] });
 }
 
 export async function createExportJob(jobType: string, params: Record<string, unknown>): Promise<ActionResult<{ id: string }>> {
-  await requireAuth();
+  const session = await requireAuth();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
 
   const id = crypto.randomUUID();
   const now = nowIso();

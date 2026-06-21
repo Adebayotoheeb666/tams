@@ -26,16 +26,19 @@ type ActionResult<T> =
 async function requireInventoryAccess() {
   const session = await auth();
   if (!session?.user) {
-    throw new Error("Unauthorized");
+    return null;
   }
   if (session.user.role === "accountant") {
-    throw new Error("Forbidden");
+    return null;
   }
   return session;
 }
 
 export async function getCategories(businessUnit?: "thrift" | "nails") {
-  await requireInventoryAccess();
+  const session = await requireInventoryAccess();
+  if (!session) {
+    return [];
+  }
 
   const conditions = businessUnit
     ? eq(categories.businessUnit, businessUnit)
@@ -50,7 +53,10 @@ export async function getCategories(businessUnit?: "thrift" | "nails") {
 export async function createCategory(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  await requireInventoryAccess();
+  const session = await requireInventoryAccess();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
 
   const parsed = createCategorySchema.safeParse(input);
   if (!parsed.success) {
@@ -95,7 +101,10 @@ export type ProductWithCategory = Product & {
 export async function getProducts(
   filters: ProductListFilters = {},
 ): Promise<ProductWithCategory[]> {
-  await requireInventoryAccess();
+  const session = await requireInventoryAccess();
+  if (!session) {
+    return [];
+  }
 
   const { businessUnit = "all", search, lowStockOnly } = filters;
   const conditions = [eq(products.isActive, 1)];
@@ -130,7 +139,10 @@ export async function getProducts(
 }
 
 export async function getProductById(id: string) {
-  await requireInventoryAccess();
+  const session = await requireInventoryAccess();
+  if (!session) {
+    return null;
+  }
 
   const product = await db.query.products.findFirst({
     where: eq(products.id, id),
@@ -155,6 +167,9 @@ export async function createProduct(
   input: unknown,
 ): Promise<ActionResult<Product>> {
   const session = await requireInventoryAccess();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
 
   const parsed = createProductSchema.safeParse(input);
   if (!parsed.success) {
@@ -222,7 +237,10 @@ export async function createProduct(
 export async function updateProduct(
   input: unknown,
 ): Promise<ActionResult<Product>> {
-  await requireInventoryAccess();
+  const session = await requireInventoryAccess();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
 
   const parsed = updateProductSchema.safeParse(input);
   if (!parsed.success) {
@@ -286,6 +304,9 @@ export async function archiveProduct(
   id: string,
 ): Promise<ActionResult<{ id: string }>> {
   const session = await requireInventoryAccess();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
   if (session.user.role !== "owner") {
     return { success: false, error: "Only the owner can archive products" };
   }
@@ -313,6 +334,9 @@ export async function adjustStock(
   input: unknown,
 ): Promise<ActionResult<Product>> {
   const session = await requireInventoryAccess();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
 
   // period lock check
   const { isPeriodLocked } = await import("@/lib/actions/bookkeeping");
@@ -389,6 +413,9 @@ export async function importProductsFromCsv(
   csvText: string,
 ): Promise<ActionResult<CsvImportResult>> {
   const session = await requireInventoryAccess();
+  if (!session) {
+    return { success: false, error: "Unauthorized" };
+  }
   if (session.user.role !== "owner") {
     return { success: false, error: "Only the owner can import products from CSV" };
   }

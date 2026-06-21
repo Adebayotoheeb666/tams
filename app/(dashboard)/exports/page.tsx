@@ -1,25 +1,9 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createExportJob, getExportJobs } from "@/lib/actions/exports";
+import { getExportJobs } from "@/lib/actions/exports";
+import { ExportButtons } from "@/components/exports/export-buttons";
 
 export default async function ExportsPage() {
   const jobs = await getExportJobs();
-
-  async function exportPdf() {
-    await createExportJob("pdf", {
-      title: "Financial statement export",
-      requestedAt: new Date().toISOString(),
-      type: "statement",
-    });
-  }
-
-  async function exportExcel() {
-    await createExportJob("excel", {
-      title: "Financial statement export",
-      requestedAt: new Date().toISOString(),
-      type: "statement",
-    });
-  }
 
   return (
     <div className="space-y-6">
@@ -28,14 +12,7 @@ export default async function ExportsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Exports</h1>
           <p className="text-muted-foreground">Trigger background export jobs and monitor file status.</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <form action={exportPdf}>
-            <Button type="submit">Export PDF</Button>
-          </form>
-          <form action={exportExcel}>
-            <Button type="submit" variant="outline">Export Excel</Button>
-          </form>
-        </div>
+        <ExportButtons />
       </div>
 
       <Card>
