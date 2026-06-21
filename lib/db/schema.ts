@@ -66,7 +66,11 @@ export const purchaseOrders = sqliteTable("purchase_orders", {
   supplierId: text("supplier_id").references(() => suppliers.id),
   orderDate: text("order_date").notNull(),
   totalAmount: integer("total_amount").notNull().default(0),
-  status: text("status", { enum: ["pending", "received", "cancelled"] }).notNull().default("pending"),
+  status: text("status", {
+    enum: ["draft", "sent", "partially-received", "received", "cancelled"],
+  })
+    .notNull()
+    .default("draft"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -79,6 +83,29 @@ export const purchaseOrderLines = sqliteTable("purchase_order_lines", {
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unit_price").notNull(),
   totalPrice: integer("total_price").notNull(),
+  quantityReceived: integer("quantity_received").notNull().default(0),
+});
+
+export const goodsReceivedNotes = sqliteTable("goods_received_notes", {
+  id: text("id").primaryKey(),
+  grnNumber: text("grn_number").notNull().unique(),
+  purchaseOrderId: text("purchase_order_id")
+    .notNull()
+    .references(() => purchaseOrders.id),
+  receivedDate: text("received_date").notNull(),
+  notes: text("notes"),
+  receivedBy: text("received_by").notNull().references(() => users.id),
+  createdAt: text("created_at").notNull(),
+});
+
+export const grnLineItems = sqliteTable("grn_line_items", {
+  id: text("id").primaryKey(),
+  grnId: text("grn_id").notNull().references(() => goodsReceivedNotes.id),
+  productId: text("product_id").notNull().references(() => products.id),
+  quantityReceived: integer("quantity_received").notNull(),
+  quantityAccepted: integer("quantity_accepted").notNull(),
+  quantityRejected: integer("quantity_rejected").notNull().default(0),
+  notes: text("notes"),
 });
 
 export const orders = sqliteTable("orders", {
@@ -275,6 +302,32 @@ export const purchaseOrderLinesRelations = relations(purchaseOrderLines, ({ one 
   }),
   product: one(products, {
     fields: [purchaseOrderLines.productId],
+    references: [products.id],
+  }),
+}));
+
+export const goodsReceivedNotesRelations = relations(
+  goodsReceivedNotes,
+  ({ one, many }) => ({
+    purchaseOrder: one(purchaseOrders, {
+      fields: [goodsReceivedNotes.purchaseOrderId],
+      references: [purchaseOrders.id],
+    }),
+    receiver: one(users, {
+      fields: [goodsReceivedNotes.receivedBy],
+      references: [users.id],
+    }),
+    lineItems: many(grnLineItems),
+  })
+);
+
+export const grnLineItemsRelations = relations(grnLineItems, ({ one }) => ({
+  grn: one(goodsReceivedNotes, {
+    fields: [grnLineItems.grnId],
+    references: [goodsReceivedNotes.id],
+  }),
+  product: one(products, {
+    fields: [grnLineItems.productId],
     references: [products.id],
   }),
 }));
