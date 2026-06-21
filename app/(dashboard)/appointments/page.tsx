@@ -1,24 +1,45 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { getAppointments } from "@/lib/actions/appointments";
 import { AppointmentList } from "@/components/appointments/appointment-list";
+import { CalendarView } from "@/components/appointments/calendar-view";
 import { Button } from "@/components/ui/button";
+import { Calendar, List } from "lucide-react";
 
 type SearchParams = {
   from?: string;
   to?: string;
 };
 
-export default async function AppointmentsPage({
+export default function AppointmentsPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const from = searchParams.from ?? new Date().toISOString().slice(0, 10);
-  const to =
-    searchParams.to ??
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "month" | "week" | "day">("month");
+  const [loading, setLoading] = useState(true);
 
-  const appointments = await getAppointments({ from, to });
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      const from = searchParams.from ?? new Date().toISOString().slice(0, 10);
+      const to =
+        searchParams.to ??
+        new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      const data = await getAppointments({ from, to });
+      setAppointments(data);
+      setLoading(false);
+    };
+
+    fetchAppointments();
+  }, [searchParams]);
+
+  if (loading) {
+    return <div className="text-center py-8">Loading appointments...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -34,25 +55,61 @@ export default async function AppointmentsPage({
         </Button>
       </div>
 
-      <form className="flex flex-wrap gap-3" method="get">
-        <input
-          type="date"
-          name="from"
-          defaultValue={from}
-          className="h-11 rounded-md border border-input bg-background px-3 text-sm"
-        />
-        <input
-          type="date"
-          name="to"
-          defaultValue={to}
-          className="h-11 rounded-md border border-input bg-background px-3 text-sm"
-        />
-        <Button type="submit" variant="secondary">
-          Filter
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={viewMode === "month" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("month")}
+        >
+          <Calendar className="h-4 w-4 mr-2" />
+          Month
         </Button>
-      </form>
+        <Button
+          variant={viewMode === "week" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("week")}
+        >
+          <Calendar className="h-4 w-4 mr-2" />
+          Week
+        </Button>
+        <Button
+          variant={viewMode === "day" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("day")}
+        >
+          <Calendar className="h-4 w-4 mr-2" />
+          Day
+        </Button>
+        <Button
+          variant={viewMode === "list" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("list")}
+        >
+          <List className="h-4 w-4 mr-2" />
+          List
+        </Button>
+      </div>
 
-      <AppointmentList appointments={appointments} />
+      {viewMode === "list" ? (
+        <AppointmentList appointments={appointments} />
+      ) : (
+        <CalendarView
+          appointments={appointments.map((apt) => ({
+            id: apt.id,
+            date: apt.appointmentDate,
+            time: apt.appointmentTime,
+            service: {
+              id: apt.service.id,
+              name: apt.service.name,
+              price: apt.service.price,
+            },
+            clientName: apt.clientName,
+            clientPhone: apt.clientPhone,
+            status: apt.status,
+          }))}
+          view={viewMode as "month" | "week" | "day"}
+        />
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   stockMovements,
   type Product,
 } from "@/lib/db/schema";
+import { triggerClient } from "@/trigger/client";
 import {
   adjustStockSchema,
   createCategorySchema,
@@ -390,6 +391,20 @@ export async function adjustStock(
   const updated = await db.query.products.findFirst({
     where: eq(products.id, productId),
   });
+
+  // Trigger low-stock alert if product fell below reorder level
+  if (updated && updated.quantity <= updated.reorderLevel && product.quantity > product.reorderLevel) {
+    try {
+      await triggerClient.triggerEvent("inventory.low-stock", {
+        productId: updated.id,
+        productName: updated.name,
+        currentQuantity: updated.quantity,
+        reorderLevel: updated.reorderLevel,
+      });
+    } catch (error) {
+      console.error("Failed to trigger low-stock event:", error);
+    }
+  }
 
   revalidatePath("/inventory");
   revalidatePath(`/inventory/${productId}`);

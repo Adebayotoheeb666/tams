@@ -2,7 +2,14 @@
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { purchaseOrders, purchaseOrderLines, products, stockMovements } from "@/lib/db/schema";
+import {
+  purchaseOrders,
+  purchaseOrderLines,
+  products,
+  stockMovements,
+  goodsReceivedNotes,
+  grnLineItems,
+} from "@/lib/db/schema";
 import {
   createPurchaseOrderSchema,
   receivePurchaseOrderSchema,
@@ -229,4 +236,141 @@ export async function bulkReceivePurchaseOrders(input: unknown): Promise<ActionR
   revalidatePath("/inventory");
 
   return { success: true, data: { ids: pendingOrders.map((order) => order.id) } };
+}
+
+export async function getGoodReceivedNotesByOrderId(orderId: string) {
+  await requireProcurementAccess();
+  return db.query.goodsReceivedNotes.findMany({
+    where: eq(goodsReceivedNotes.purchaseOrderId, orderId),
+    with: {
+      receiver: { columns: { id: true, name: true } },
+      lineItems: { with: { product: true } },
+    },
+    orderBy: [desc(goodsReceivedNotes.receivedDate)],
+  });
+}
+
+export async function createGoodsReceivedNote(input: {
+  purchaseOrderId: string;
+  lineItems: Array<{
+    productId: string;
+    quantityReceived: number;
+    quantityAccepted: number;
+    quantityRejected?: number;
+    notes?: string;
+  }>;
+  notes?: string;
+}): Promise<ActionResult<{ id: string; grnNumber: string }>> {
+  await requireProcurementAccess();
+
+  const po = await db.query.purchaseOrders.findFirst({
+    where: eq(purchaseOrders.id, input.purchaseOrderId),
+    with: { lines: true },
+  });
+
+  if (!po) return { success: false, error: "Purchase order not found" };
+  if (po.status === "cancelled")
+    return { success: false, error: "Cannot receive cancelled order" };
+
+  const now = nowIso();
+  const grnId = crypto.randomUUID();
+  const grnNumber = `GRN-${Date.now()}`;
+
+  try {
+    await db.transaction(async (tx) => {
+      // Create GRN record
+      const session = await auth();
+      await tx.insert(goodsReceivedNotes).values({
+        id: grnId,
+        grnNumber,
+        purchaseOrderId: input.purchaseOrderId,
+        receivedDate: now,
+        notes: input.notes || null,
+        receivedBy: session?.user?.id ?? "",
+        createdAt: now,
+      });
+
+      // Track line item receives and update stock
+      let totalReceived = 0;
+      const poLineMap = new Map(po.lines.map((l) => [l.productId, l]));
+
+      for (const item of input.lineItems) {
+        const poLine = poLineMap.get(item.productId);
+        if (!poLine) continue;
+
+        // Insert GRN line item
+        await tx.insert(grnLineItems).values({
+          id: crypto.randomUUID(),
+          grnId,
+          productId: item.productId,
+          quantityReceived: item.quantityReceived,
+          quantityAccepted: item.quantityAccepted,
+          quantityRejected: item.quantityRejected || 0,
+          notes: item.notes || null,
+        });
+
+        // Update product stock with accepted quantity
+        const product = await tx.query.products.findFirst({
+          where: eq(products.id, item.productId),
+        });
+        if (!product) continue;
+
+        const before = product.quantity;
+        const after = before + item.quantityAccepted;
+
+        await tx.update(products).set({ quantity: after, updatedAt: now }).where(eq(products.id, item.productId));
+
+        await tx.insert(stockMovements).values({
+          id: crypto.randomUUID(),
+          productId: item.productId,
+          delta: item.quantityAccepted,
+          quantityBefore: before,
+          quantityAfter: after,
+          reason: `GRN ${grnNumber} (PO ${po.orderNumber})`,
+          createdBy: session?.user?.id ?? "",
+          createdAt: now,
+        });
+
+        totalReceived += item.quantityAccepted;
+      }
+
+      // Update PO status based on total received
+      const totalOrdered = po.lines.reduce((sum, l) => sum + l.quantity, 0);
+      const currentReceived = po.lines.reduce((sum, l) => sum + (l.quantityReceived || 0), 0);
+      const newTotal = currentReceived + totalReceived;
+
+      let newStatus: "sent" | "partially-received" | "received";
+      if (newTotal === 0) {
+        newStatus = "sent";
+      } else if (newTotal >= totalOrdered) {
+        newStatus = "received";
+      } else {
+        newStatus = "partially-received";
+      }
+
+      // Update quantityReceived in purchase order lines
+      for (const item of input.lineItems) {
+        const poLine = poLineMap.get(item.productId);
+        if (!poLine) continue;
+        await tx
+          .update(purchaseOrderLines)
+          .set({
+            quantityReceived: (poLine.quantityReceived || 0) + item.quantityAccepted,
+          })
+          .where(eq(purchaseOrderLines.id, poLine.id));
+      }
+
+      await tx.update(purchaseOrders).set({ status: newStatus, updatedAt: now }).where(eq(purchaseOrders.id, input.purchaseOrderId));
+    });
+
+    revalidatePath("/procurement");
+    revalidatePath("/inventory");
+
+    return { success: true, data: { id: grnId, grnNumber } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create GRN",
+    };
+  }
 }

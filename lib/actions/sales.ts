@@ -8,6 +8,7 @@ import {
   revenueAccountCode,
 } from "@/lib/accounting/accounts";
 import { db } from "@/lib/db";
+import { triggerClient } from "@/trigger/client";
 import {
   accounts,
   journalEntries,
@@ -363,6 +364,25 @@ export async function createSale(
 
       return { order, items: insertedItems };
     });
+
+    // Trigger low-stock alerts for products that fell below reorder level
+    for (const product of dbProducts) {
+      const updatedProduct = await db.query.products.findFirst({
+        where: eq(products.id, product.id),
+      });
+      if (updatedProduct && updatedProduct.quantity <= updatedProduct.reorderLevel && product.quantity > product.reorderLevel) {
+        try {
+          await triggerClient.triggerEvent("inventory.low-stock", {
+            productId: product.id,
+            productName: product.name,
+            currentQuantity: updatedProduct.quantity,
+            reorderLevel: updatedProduct.reorderLevel,
+          });
+        } catch (error) {
+          console.error("Failed to trigger low-stock event:", error);
+        }
+      }
+    }
 
     revalidatePath("/");
     revalidatePath("/sales");

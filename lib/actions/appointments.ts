@@ -12,6 +12,7 @@ import {
   type Appointment,
   type Service,
 } from "@/lib/db/schema";
+import { triggerClient } from "@/trigger/client";
 import {
   bookAppointmentSchema,
   updateAppointmentStatusSchema,
@@ -195,6 +196,27 @@ export async function bookAppointment(
     createdAt: nowIso(),
   });
 
+  // Schedule reminder for 24 hours before appointment
+  try {
+    const appointmentDateTime = new Date(`${data.appointmentDate}T${data.startTime}`);
+    const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
+    const now = new Date();
+
+    if (reminderTime > now) {
+      await triggerClient.triggerEvent("appointment.reminder-scheduled", {
+        appointmentId: id,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        serviceName: service.name,
+        appointmentDate: data.appointmentDate,
+        appointmentTime: data.startTime,
+        reminderTime: reminderTime.toISOString(),
+      });
+    }
+  } catch (error) {
+    console.error("Failed to schedule appointment reminder:", error);
+  }
+
   revalidatePath("/appointments");
   revalidatePath("/");
 
@@ -252,6 +274,31 @@ export async function updateAppointmentStatus(
       .update(appointments)
       .set({ status })
       .where(eq(appointments.id, appointmentId));
+
+    // Trigger reminder when confirmed
+    if (status === "confirmed") {
+      try {
+        const appointmentDateTime = new Date(
+          `${appointment.appointmentDate}T${appointment.startTime}`
+        );
+        const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
+        const now = new Date();
+
+        if (reminderTime > now) {
+          await triggerClient.triggerEvent("appointment.confirmed", {
+            appointmentId,
+            customerName: appointment.customerName,
+            customerPhone: appointment.customerPhone,
+            serviceName: appointment.service.name,
+            appointmentDate: appointment.appointmentDate,
+            appointmentTime: appointment.startTime,
+            reminderTime: reminderTime.toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error("Failed to trigger confirmation reminder:", error);
+      }
+    }
   }
 
   revalidatePath("/appointments");
