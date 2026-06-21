@@ -9,6 +9,10 @@ cloudinary.config({
 
 export async function POST(request: Request) {
   try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return NextResponse.json({ error: "Image upload is not configured. Please set Cloudinary credentials." }, { status: 500 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
     if (!file || typeof file === "string" || !(file instanceof File)) {
@@ -27,6 +31,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: uploadResult.secure_url });
   } catch (err: unknown) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    console.error("Upload error:", err);
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Upload failed" }, { status: 500 });
   }
 }
