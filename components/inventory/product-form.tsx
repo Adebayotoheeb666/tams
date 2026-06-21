@@ -47,12 +47,11 @@ export function ProductForm({ categories, product, mode }: ProductFormProps) {
           method: "POST",
           body: uploadFd,
         });
+        const json = await res.json();
         if (!res.ok) {
-          const text = await res.text();
-          setError(text || "Image upload failed");
+          setError(json.error || "Image upload failed");
           return;
         }
-        const json = await res.json();
         imageUrl = json.url;
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Image upload failed");
