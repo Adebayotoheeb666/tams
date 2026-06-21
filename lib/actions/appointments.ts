@@ -275,3 +275,151 @@ export async function getUpcomingAppointments(limit = 5) {
     limit,
   });
 }
+
+async function requireOwnerAccess() {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "owner") throw new Error("Forbidden");
+  return session;
+}
+
+export async function getAllServices(): Promise<Service[]> {
+  await requireOwnerAccess();
+  return db.query.services.findMany({
+    orderBy: [asc(services.name)],
+  });
+}
+
+export async function createService(input: {
+  name: string;
+  durationMinutes: number;
+  price: number;
+  materialsConsumed?: string;
+}): Promise<ActionResult<Service>> {
+  await requireOwnerAccess();
+
+  const { name, durationMinutes, price, materialsConsumed } = input;
+
+  if (!name.trim()) {
+    return { success: false, error: "Service name is required" };
+  }
+
+  if (durationMinutes <= 0) {
+    return { success: false, error: "Duration must be greater than 0" };
+  }
+
+  if (price < 0) {
+    return { success: false, error: "Price cannot be negative" };
+  }
+
+  const id = crypto.randomUUID();
+  await db.insert(services).values({
+    id,
+    name: name.trim(),
+    durationMinutes,
+    price,
+    materialsConsumed: materialsConsumed?.trim() || null,
+    isActive: 1,
+    createdAt: nowIso(),
+  });
+
+  revalidatePath("/services");
+
+  const newService = await db.query.services.findFirst({
+    where: eq(services.id, id),
+  });
+
+  if (!newService) {
+    return { success: false, error: "Failed to create service" };
+  }
+
+  return { success: true, data: newService };
+}
+
+export async function updateService(
+  id: string,
+  input: {
+    name: string;
+    durationMinutes: number;
+    price: number;
+    materialsConsumed?: string;
+  },
+): Promise<ActionResult<Service>> {
+  await requireOwnerAccess();
+
+  const { name, durationMinutes, price, materialsConsumed } = input;
+
+  if (!name.trim()) {
+    return { success: false, error: "Service name is required" };
+  }
+
+  if (durationMinutes <= 0) {
+    return { success: false, error: "Duration must be greater than 0" };
+  }
+
+  if (price < 0) {
+    return { success: false, error: "Price cannot be negative" };
+  }
+
+  const existing = await db.query.services.findFirst({
+    where: eq(services.id, id),
+  });
+
+  if (!existing) {
+    return { success: false, error: "Service not found" };
+  }
+
+  await db
+    .update(services)
+    .set({
+      name: name.trim(),
+      durationMinutes,
+      price,
+      materialsConsumed: materialsConsumed?.trim() || null,
+    })
+    .where(eq(services.id, id));
+
+  revalidatePath("/services");
+
+  const updated = await db.query.services.findFirst({
+    where: eq(services.id, id),
+  });
+
+  if (!updated) {
+    return { success: false, error: "Failed to update service" };
+  }
+
+  return { success: true, data: updated };
+}
+
+export async function toggleServiceActive(
+  id: string,
+  isActive: boolean,
+): Promise<ActionResult<Service>> {
+  await requireOwnerAccess();
+
+  const existing = await db.query.services.findFirst({
+    where: eq(services.id, id),
+  });
+
+  if (!existing) {
+    return { success: false, error: "Service not found" };
+  }
+
+  await db
+    .update(services)
+    .set({ isActive: isActive ? 1 : 0 })
+    .where(eq(services.id, id));
+
+  revalidatePath("/services");
+
+  const updated = await db.query.services.findFirst({
+    where: eq(services.id, id),
+  });
+
+  if (!updated) {
+    return { success: false, error: "Failed to toggle service" };
+  }
+
+  return { success: true, data: updated };
+}

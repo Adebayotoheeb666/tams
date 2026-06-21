@@ -13,6 +13,7 @@ import {
   Download,
   BarChart3,
   LogOut,
+  Scissors,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/sales/new", label: "POS", icon: ShoppingCart, roles: ["owner", "staff"] as UserRole[] },
   { href: "/sales", label: "Sales", icon: ShoppingCart, roles: ["owner", "staff"] as UserRole[] },
   { href: "/appointments", label: "Appointments", icon: Calendar, roles: ["owner", "staff"] as UserRole[] },
+  { href: "/services", label: "Services", icon: Scissors, roles: ["owner"] as UserRole[] },
   { href: "/exports", label: "Exports", icon: Download, roles: ["owner", "staff", "accountant"] as UserRole[] },
   { href: "/finance", label: "Finance", icon: BarChart3, roles: ["owner", "accountant"] as UserRole[] },
   { href: "/bookkeeping/ledger", label: "Ledger", icon: BookOpen, roles: ["owner", "accountant"] as UserRole[] },

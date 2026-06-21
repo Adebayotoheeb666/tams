@@ -9,6 +9,7 @@ const staffAllowedPrefixes = [
   "/inventory",
   "/sales",
   "/appointments",
+  "/exports",
   "/login",
 ];
 
@@ -21,7 +22,8 @@ function pathAllowedForRole(pathname: string, role: UserRole): boolean {
     return (
       pathname === "/" ||
       pathname.startsWith("/finance") ||
-      pathname.startsWith("/bookkeeping")
+      pathname.startsWith("/bookkeeping") ||
+      pathname.startsWith("/exports")
     );
   }
 

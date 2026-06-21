@@ -15,10 +15,12 @@ import {
   orderItems,
   orders,
   products,
+  refunds,
   stockMovements,
   type Order,
   type OrderItem,
   type Product,
+  type Refund,
 } from "@/lib/db/schema";
 import { allocateDiscountByUnit, buildReceiptFromOrder } from "@/lib/sales/receipt";
 import {
@@ -448,4 +450,340 @@ export async function getSalesHistory(input: unknown = {}) {
     limit,
     totalPages: Math.ceil((totalResult[0]?.value ?? 0) / limit),
   };
+}
+
+export async function processRefund(input: {
+  orderId: string;
+  refundAmount: number;
+  reason: string;
+  refundMethod: "cash" | "transfer" | "credit";
+}): Promise<ActionResult<Refund>> {
+  const session = await requireSalesAccess();
+
+  const { orderId, refundAmount, reason, refundMethod } = input;
+
+  if (refundAmount <= 0) {
+    return { success: false, error: "Refund amount must be greater than 0" };
+  }
+
+  try {
+    if (await isPeriodLocked(todayDateString())) {
+      return { success: false, error: "Accounting period is locked" };
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({
+        where: eq(orders.id, orderId),
+        with: { items: true },
+      });
+
+      if (!order) {
+        throw new Error("Order not found");
+      }
+
+      if (refundAmount > order.totalAmount) {
+        throw new Error(
+          `Refund amount cannot exceed order total (${order.totalAmount / 100})`,
+        );
+      }
+
+      const now = nowIso();
+      const entryDate = todayDateString();
+
+      const [{ value: refundCount }] = await tx
+        .select({ value: count() })
+        .from(refunds);
+      const refundNumber = `REF-${String(Number(refundCount) + 1).padStart(4, "0")}`;
+
+      const refundId = crypto.randomUUID();
+      await tx.insert(refunds).values({
+        id: refundId,
+        orderId,
+        refundNumber,
+        reason,
+        refundAmount,
+        refundMethod,
+        status: "processed",
+        createdBy: session.user.id,
+        createdAt: now,
+      });
+
+      const isFullRefund = refundAmount === order.totalAmount;
+
+      if (isFullRefund) {
+        await tx
+          .update(orders)
+          .set({
+            paymentStatus: "partial",
+            amountPaid: order.amountPaid - refundAmount,
+            balanceDue: (order.balanceDue || 0) + refundAmount,
+            updatedAt: now,
+          })
+          .where(eq(orders.id, orderId));
+
+        const orderItems = await tx.query.orderItems.findMany({
+          where: eq(orderItems.orderId, orderId),
+        });
+
+        for (const item of orderItems) {
+          const product = await tx.query.products.findFirst({
+            where: eq(products.id, item.productId),
+          });
+
+          if (product) {
+            const quantityAfter = product.quantity + item.quantity;
+            await tx
+              .update(products)
+              .set({ quantity: quantityAfter, updatedAt: now })
+              .where(eq(products.id, item.productId));
+
+            await tx.insert(stockMovements).values({
+              id: crypto.randomUUID(),
+              productId: item.productId,
+              delta: item.quantity,
+              quantityBefore: product.quantity,
+              quantityAfter,
+              reason: `Refund ${refundNumber}`,
+              createdBy: session.user.id,
+              createdAt: now,
+            });
+          }
+        }
+      } else {
+        const newAmountPaid = order.amountPaid - refundAmount;
+        const newBalanceDue = order.balanceDue + refundAmount;
+
+        await tx
+          .update(orders)
+          .set({
+            paymentStatus:
+              newAmountPaid === 0 ? "unpaid" : "partial",
+            amountPaid: newAmountPaid,
+            balanceDue: newBalanceDue,
+            updatedAt: now,
+          })
+          .where(eq(orders.id, orderId));
+      }
+
+      const accountCodes = new Set<string>([
+        paymentAccountCode(refundMethod),
+        revenueAccountCode("thrift"),
+        revenueAccountCode("nails"),
+      ]);
+      const accountMap = await getAccountMap(tx, Array.from(accountCodes));
+
+      const journalEntryId = crypto.randomUUID();
+      await tx.insert(journalEntries).values({
+        id: journalEntryId,
+        entryNumber: await nextJournalEntryNumber(tx),
+        entryDate,
+        description: `Refund ${refundNumber} for ${order.receiptNumber}`,
+        referenceType: "sale",
+        referenceId: orderId,
+        isReversed: 0,
+        createdBy: session.user.id,
+        createdAt: now,
+      });
+
+      const journalLines: Array<{
+        accountId: string;
+        entryType: "debit" | "credit";
+        amount: number;
+        description?: string;
+      }> = [
+        {
+          accountId: accountMap.get(revenueAccountCode("thrift"))!,
+          entryType: "debit",
+          amount: refundAmount,
+          description: `Refund reversal — ${refundNumber}`,
+        },
+        {
+          accountId: accountMap.get(paymentAccountCode(refundMethod))!,
+          entryType: "credit",
+          amount: refundAmount,
+          description: `Refund payment — ${refundNumber}`,
+        },
+      ];
+
+      assertBalanced(journalLines);
+
+      for (const line of journalLines) {
+        await tx.insert(journalEntryLines).values({
+          id: crypto.randomUUID(),
+          journalEntryId,
+          accountId: line.accountId,
+          entryType: line.entryType,
+          amount: line.amount,
+          description: line.description,
+        });
+      }
+
+      return await tx.query.refunds.findFirst({
+        where: eq(refunds.id, refundId),
+      });
+    });
+
+    revalidatePath("/");
+    revalidatePath("/sales");
+    revalidatePath("/inventory");
+
+    if (!result) {
+      return { success: false, error: "Failed to process refund" };
+    }
+
+    return { success: true, data: result };
+  } catch (error) {
+    try {
+      await logAudit("refund.error", session?.user?.id ?? null, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } catch {}
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to process refund",
+    };
+  }
+}
+
+export async function getRefundsByOrderId(orderId: string) {
+  await requireSalesAccess();
+
+  return db.query.refunds.findMany({
+    where: eq(refunds.orderId, orderId),
+    with: { createdByUser: { columns: { name: true } } },
+    orderBy: [desc(refunds.createdAt)],
+  });
+}
+
+export async function recordPartialPayment(input: {
+  orderId: string;
+  amountPaid: number;
+  paymentMethod: "cash" | "transfer" | "pos";
+}): Promise<ActionResult<Order>> {
+  const session = await requireSalesAccess();
+  const { orderId, amountPaid, paymentMethod } = input;
+
+  if (amountPaid <= 0) {
+    return { success: false, error: "Payment amount must be greater than 0" };
+  }
+
+  try {
+    const entryDate = todayDateString();
+    if (await isPeriodLocked(entryDate)) {
+      return { success: false, error: "Accounting period is locked" };
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({
+        where: eq(orders.id, orderId),
+      });
+
+      if (!order) {
+        throw new Error("Order not found");
+      }
+
+      const balanceDue = order.balanceDue || 0;
+      if (amountPaid > balanceDue) {
+        throw new Error(
+          `Payment amount cannot exceed balance due (${balanceDue / 100})`,
+        );
+      }
+
+      const now = nowIso();
+      const newAmountPaid = order.amountPaid + amountPaid;
+      const newBalanceDue = balanceDue - amountPaid;
+
+      const newPaymentStatus =
+        newBalanceDue === 0
+          ? "paid"
+          : newAmountPaid === 0
+            ? "unpaid"
+            : "partial";
+
+      await tx
+        .update(orders)
+        .set({
+          amountPaid: newAmountPaid,
+          balanceDue: newBalanceDue,
+          paymentStatus: newPaymentStatus,
+          updatedAt: now,
+        })
+        .where(eq(orders.id, orderId));
+
+      const accountCodes = new Set<string>([
+        paymentAccountCode(paymentMethod),
+        revenueAccountCode("thrift"),
+      ]);
+      const accountMap = await getAccountMap(tx, Array.from(accountCodes));
+
+      const journalEntryId = crypto.randomUUID();
+      await tx.insert(journalEntries).values({
+        id: journalEntryId,
+        entryNumber: await nextJournalEntryNumber(tx),
+        entryDate,
+        description: `Partial payment for ${order.receiptNumber}`,
+        referenceType: "sale",
+        referenceId: orderId,
+        isReversed: 0,
+        createdBy: session.user.id,
+        createdAt: now,
+      });
+
+      const journalLines: Array<{
+        accountId: string;
+        entryType: "debit" | "credit";
+        amount: number;
+        description?: string;
+      }> = [
+        {
+          accountId: accountMap.get(paymentAccountCode(paymentMethod))!,
+          entryType: "debit",
+          amount: amountPaid,
+          description: `Payment — ${order.receiptNumber}`,
+        },
+        {
+          accountId: accountMap.get(revenueAccountCode("thrift"))!,
+          entryType: "credit",
+          amount: amountPaid,
+          description: `Payment received — ${order.receiptNumber}`,
+        },
+      ];
+
+      assertBalanced(journalLines);
+
+      for (const line of journalLines) {
+        await tx.insert(journalEntryLines).values({
+          id: crypto.randomUUID(),
+          journalEntryId,
+          accountId: line.accountId,
+          entryType: line.entryType,
+          amount: line.amount,
+          description: line.description,
+        });
+      }
+
+      return await tx.query.orders.findFirst({
+        where: eq(orders.id, orderId),
+      });
+    });
+
+    revalidatePath("/");
+    revalidatePath("/sales");
+
+    if (!result) {
+      return { success: false, error: "Failed to record payment" };
+    }
+
+    return { success: true, data: result };
+  } catch (error) {
+    try {
+      await logAudit("payment.error", session?.user?.id ?? null, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } catch {}
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to record payment",
+    };
+  }
 }

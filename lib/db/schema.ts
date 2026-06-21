@@ -117,6 +117,26 @@ export const orderItems = sqliteTable("order_items", {
   totalPrice: integer("total_price").notNull(),
 });
 
+export const refunds = sqliteTable("refunds", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => orders.id),
+  refundNumber: text("refund_number").notNull().unique(),
+  reason: text("reason").notNull(),
+  refundAmount: integer("refund_amount").notNull(),
+  refundMethod: text("refund_method", {
+    enum: ["cash", "transfer", "credit"],
+  }).notNull(),
+  status: text("status", {
+    enum: ["pending", "processed", "rejected"],
+  }).notNull().default("pending"),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+});
+
 export const stockMovements = sqliteTable("stock_movements", {
   id: text("id").primaryKey(),
   productId: text("product_id")
@@ -233,6 +253,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [users.id],
   }),
   items: many(orderItems),
+  refunds: many(refunds),
 }));
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
@@ -317,6 +338,17 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
   service: one(services, {
     fields: [appointments.serviceId],
     references: [services.id],
+  }),
+}));
+
+export const refundsRelations = relations(refunds, ({ one }) => ({
+  order: one(orders, {
+    fields: [refunds.orderId],
+    references: [orders.id],
+  }),
+  createdByUser: one(users, {
+    fields: [refunds.createdBy],
+    references: [users.id],
   }),
 }));
 
