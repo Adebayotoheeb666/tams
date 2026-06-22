@@ -39,9 +39,8 @@ export default async function SaleDetailPage({
         <div className="flex gap-2">
           <RefundForm
             orderId={order.id}
-            totalAmount={order.totalAmount}
             amountPaid={order.amountPaid}
-            paymentMethod={order.paymentMethod as "cash" | "card" | "transfer" | "credit"}
+            paymentMethod={order.paymentMethod as "cash" | "transfer" | "pos"}
           />
           <Button asChild variant="outline" size="sm">
             <Link href="/sales">Back to sales</Link>

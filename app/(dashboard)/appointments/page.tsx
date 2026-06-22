@@ -7,10 +7,15 @@ import { AppointmentList } from "@/components/appointments/appointment-list";
 import { CalendarView } from "@/components/appointments/calendar-view";
 import { Button } from "@/components/ui/button";
 import { Calendar, List } from "lucide-react";
+import type { Appointment, Service } from "@/lib/db/schema";
 
 type SearchParams = {
   from?: string;
   to?: string;
+};
+
+type AppointmentRow = Appointment & {
+  service: Pick<Service, "id" | "name" | "durationMinutes">;
 };
 
 export default function AppointmentsPage({
@@ -18,7 +23,7 @@ export default function AppointmentsPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "month" | "week" | "day">("month");
   const [loading, setLoading] = useState(true);
 
@@ -97,14 +102,14 @@ export default function AppointmentsPage({
           appointments={appointments.map((apt) => ({
             id: apt.id,
             date: apt.appointmentDate,
-            time: apt.appointmentTime,
+            time: apt.startTime,
             service: {
               id: apt.service.id,
               name: apt.service.name,
-              price: apt.service.price,
+              price: apt.priceCharged,
             },
-            clientName: apt.clientName,
-            clientPhone: apt.clientPhone,
+            clientName: apt.customerName,
+            clientPhone: apt.customerPhone,
             status: apt.status,
           }))}
           view={viewMode as "month" | "week" | "day"}

@@ -530,27 +530,27 @@ export async function processRefund(input: {
 
       const isFullRefund = refundAmount === order.totalAmount;
 
-      if (isFullRefund) {
-        await tx
-          .update(orders)
-          .set({
-            paymentStatus: "partial",
-            amountPaid: order.amountPaid - refundAmount,
-            balanceDue: (order.balanceDue || 0) + refundAmount,
-            updatedAt: now,
-          })
-          .where(eq(orders.id, orderId));
+        if (isFullRefund) {
+          await tx
+            .update(orders)
+            .set({
+              paymentStatus: "partial",
+              amountPaid: order.amountPaid - refundAmount,
+              balanceDue: (order.balanceDue || 0) + refundAmount,
+            })
+            .where(eq(orders.id, orderId));
 
-        const orderItems = await tx.query.orderItems.findMany({
-          where: eq(orderItems.orderId, orderId),
-        });
-
-        for (const item of orderItems) {
-          const product = await tx.query.products.findFirst({
-            where: eq(products.id, item.productId),
+          const items = await tx.query.orderItems.findMany({
+            where: eq(orderItems.orderId, orderId),
           });
 
-          if (product) {
+          for (const item of items) {
+            const product = await tx.query.products.findFirst({
+              where: eq(products.id, item.productId),
+            });
+
+            if (!product) continue;
+
             const quantityAfter = product.quantity + item.quantity;
             await tx
               .update(products)
@@ -568,8 +568,7 @@ export async function processRefund(input: {
               createdAt: now,
             });
           }
-        }
-      } else {
+        } else {
         const newAmountPaid = order.amountPaid - refundAmount;
         const newBalanceDue = order.balanceDue + refundAmount;
 
@@ -580,7 +579,6 @@ export async function processRefund(input: {
               newAmountPaid === 0 ? "unpaid" : "partial",
             amountPaid: newAmountPaid,
             balanceDue: newBalanceDue,
-            updatedAt: now,
           })
           .where(eq(orders.id, orderId));
       }
@@ -726,13 +724,12 @@ export async function recordPartialPayment(input: {
           amountPaid: newAmountPaid,
           balanceDue: newBalanceDue,
           paymentStatus: newPaymentStatus,
-          updatedAt: now,
-        })
-        .where(eq(orders.id, orderId));
+        });
 
       const accountCodes = new Set<string>([
         paymentAccountCode(paymentMethod),
         revenueAccountCode("thrift"),
+        revenueAccountCode("nails"),
       ]);
       const accountMap = await getAccountMap(tx, Array.from(accountCodes));
 

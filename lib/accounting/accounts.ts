@@ -11,7 +11,7 @@ export const ACCOUNT_CODES = {
 } as const;
 
 export function paymentAccountCode(
-  method: "cash" | "transfer" | "pos",
+  method: "cash" | "transfer" | "pos" | "credit",
 ): string {
   return method === "cash" ? ACCOUNT_CODES.CASH : ACCOUNT_CODES.BANK;
 }

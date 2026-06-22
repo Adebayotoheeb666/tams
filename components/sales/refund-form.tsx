@@ -3,23 +3,10 @@
 import { useState } from "react";
 import { processRefund } from "@/lib/actions/sales";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatNaira, koboToNaira } from "@/lib/utils";
 import { AlertCircle, CheckCircle, RotateCcw } from "lucide-react";
@@ -27,14 +14,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export type RefundFormProps = {
   orderId: string;
-  totalAmount: number;
   amountPaid: number;
-  paymentMethod: "cash" | "card" | "transfer" | "credit";
+  paymentMethod: "cash" | "transfer" | "pos";
 };
 
 export function RefundForm({
   orderId,
-  totalAmount,
   amountPaid,
   paymentMethod,
 }: RefundFormProps) {
@@ -99,19 +84,15 @@ export function RefundForm({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <RotateCcw className="h-4 w-4" />
-          Process Refund
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Process Refund</DialogTitle>
-        </DialogHeader>
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <RotateCcw className="h-4 w-4" />
+        Process Refund
+      </Button>
 
-        <div className="space-y-4 py-4">
+      <Dialog open={open} onClose={() => setOpen(false)}>
+        <div className="sm:max-w-md">
+          <div className="space-y-4 py-4">
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -154,20 +135,16 @@ export function RefundForm({
             <div>
               <Label htmlFor="method">Refund Method</Label>
               <Select
+                id="method"
                 value={refundMethod}
-                onValueChange={(value) =>
-                  setRefundMethod(value as "cash" | "transfer" | "credit")
+                onChange={(e) =>
+                  setRefundMethod(e.target.value as "cash" | "transfer" | "credit")
                 }
                 disabled={loading || success}
               >
-                <SelectTrigger id="method">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="credit">Credit Account</SelectItem>
-                </SelectContent>
+                <option value="cash">Cash</option>
+                <option value="transfer">Bank Transfer</option>
+                <option value="credit">Credit Account</option>
               </Select>
             </div>
 
@@ -202,7 +179,8 @@ export function RefundForm({
             </div>
           </form>
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+        </div>
+      </Dialog>
+      </>
+    );
+  }

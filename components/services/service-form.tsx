@@ -39,7 +39,7 @@ export function ServiceForm({ mode, service }: ServiceFormProps) {
     setIsLoading(true);
 
     try {
-      const price = Math.round(nairaToKobo(parseFloat(priceNaira || "0")));
+const price = Math.round(nairaToKobo(parseFloat(String(priceNaira || "0"))));
 
       if (mode === "create") {
         const result = await createService({
@@ -70,7 +70,7 @@ export function ServiceForm({ mode, service }: ServiceFormProps) {
           toast.error(result.error);
         }
       }
-    } catch (error) {
+    } catch {
       toast.error("Something went wrong");
     } finally {
       setIsLoading(false);

@@ -67,7 +67,7 @@ export const purchaseOrders = sqliteTable("purchase_orders", {
   orderDate: text("order_date").notNull(),
   totalAmount: integer("total_amount").notNull().default(0),
   status: text("status", {
-    enum: ["draft", "sent", "partially-received", "received", "cancelled"],
+    enum: ["draft", "sent", "pending", "partially-received", "received", "cancelled"],
   })
     .notNull()
     .default("draft"),
@@ -419,6 +419,7 @@ export type UserRole = User["role"];
 export type Supplier = typeof suppliers.$inferSelect;
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type PurchaseOrderLine = typeof purchaseOrderLines.$inferSelect;
+export type Refund = typeof refunds.$inferSelect;
 
 export const exportJobs = sqliteTable("export_jobs", {
   id: text("id").primaryKey(),
