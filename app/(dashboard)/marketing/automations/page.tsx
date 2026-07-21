@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { getAutomationSettings, updateAutomationSetting } from "@/lib/actions/automation";
 import { normalizeAutomationSettingValue } from "@/lib/utils/marketing/automation-settings";
 import { redirect } from "next/navigation";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function updateAutomationSettingsAction(formData: FormData) {
   "use server";

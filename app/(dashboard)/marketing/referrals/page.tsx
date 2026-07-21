@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { generateReferralCodeForCustomer, completeReferral, getReferrals } from "@/lib/actions/marketing";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function generateCodeAction(formData: FormData) {
   "use server";

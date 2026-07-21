@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import Link from "next/link";
 import { getUpcomingAppointments } from "@/lib/actions/appointments";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -193,8 +194,15 @@ export default async function DashboardPage() {
           db.select({ count: count() }).from(customerTestimonials).where(sql`${customerTestimonials.status} IN ('approved', 'featured')`),
           db.select({ count: count() }).from(referralProgram).where(eq(referralProgram.status, 'completed')),
           db.select({ count: count() }).from(marketingKpis),
+          db
+            .select({ total: sql<number>`coalesce(sum(${marketingCampaigns.budgetAllocation}), 0)` })
+            .from(marketingCampaigns)
+            .where(sql`${marketingCampaigns.status} IN ('active', 'scheduled')`),
+          db.select({ total: count(), converted: sql<number>`coalesce(sum(case when ${leads.status} = 'converted' then 1 else 0 end), 0)` }).from(leads),
+          db.select({ expected: sql<number>`coalesce(sum(${contentCalendar.expectedReach}), 0)`, actual: sql<number>`coalesce(sum(${contentCalendar.actualReach}), 0)` }).from(contentCalendar),
+          db.select({ recipients: sql<number>`coalesce(sum(${whatsappBroadcasts.totalRecipients}), 0)`, sent: sql<number>`coalesce(sum(${whatsappBroadcasts.sentCount}), 0)`, read: sql<number>`coalesce(sum(${whatsappBroadcasts.readCount}), 0)`, clicks: sql<number>`coalesce(sum(${whatsappBroadcasts.clickCount}), 0)` }).from(whatsappBroadcasts),
         ])
-      : Promise.resolve([[], [], [], [], [], [], []]),
+      : Promise.resolve([[], [], [], [], [], [], [], [], [], [], []]),
   ]);
 
   const todayRevenue = todaySales[0]?.total ?? 0;
@@ -216,6 +224,18 @@ export default async function DashboardPage() {
   const approvedTestimonialCount = marketingSnapshot[4][0]?.count ?? 0;
   const completedReferralCount = marketingSnapshot[5][0]?.count ?? 0;
   const loggedKpiCount = marketingSnapshot[6][0]?.count ?? 0;
+  const activeCampaignBudget = marketingSnapshot[7][0]?.total ?? 0;
+  const totalLeadCount = marketingSnapshot[8][0]?.total ?? 0;
+  const convertedLeadCount = marketingSnapshot[8][0]?.converted ?? 0;
+  const leadConversionRate = totalLeadCount ? Math.round((convertedLeadCount / totalLeadCount) * 100) : 0;
+  const plannedReach = marketingSnapshot[9][0]?.expected ?? 0;
+  const actualReach = marketingSnapshot[9][0]?.actual ?? 0;
+  const broadcastRecipients = marketingSnapshot[10][0]?.recipients ?? 0;
+  const broadcastSent = marketingSnapshot[10][0]?.sent ?? 0;
+  const broadcastRead = marketingSnapshot[10][0]?.read ?? 0;
+  const broadcastClicks = marketingSnapshot[10][0]?.clicks ?? 0;
+  const broadcastDeliveryRate = broadcastRecipients ? Math.round((broadcastSent / broadcastRecipients) * 100) : 0;
+  const broadcastReadRate = broadcastSent ? Math.round((broadcastRead / broadcastSent) * 100) : 0;
 
   return (
     <div className="space-y-8">
@@ -260,6 +280,10 @@ export default async function DashboardPage() {
           <MetricCard label="Approved testimonials" value={approvedTestimonialCount} description="Social proof ready to share" href="/marketing/testimonials" icon={Star} tone={approvedTestimonialCount > 0 ? "success" : "default"} />
           <MetricCard label="Completed referrals" value={completedReferralCount} description="Referral conversions and rewards" href="/marketing/referrals" icon={Target} tone={completedReferralCount > 0 ? "success" : "default"} />
           <MetricCard label="KPIs logged" value={loggedKpiCount} description="Platform metrics available for review" href="/marketing/analytics" icon={BarChart3} />
+          <MetricCard label="Lead conversion" value={`${leadConversionRate}%`} description={`${convertedLeadCount} of ${totalLeadCount} leads converted`} href="/marketing/leads" icon={Target} tone={leadConversionRate > 0 ? "success" : "default"} />
+          <MetricCard label="Content reach" value={actualReach.toLocaleString()} description={`${plannedReach.toLocaleString()} planned impressions`} href="/marketing/content-calendar" icon={BarChart3} />
+          <MetricCard label="Broadcast delivery" value={`${broadcastDeliveryRate}%`} description={`${broadcastSent.toLocaleString()} delivered · ${broadcastReadRate}% read`} href="/marketing/broadcasts" icon={Send} tone={broadcastDeliveryRate > 0 ? "success" : "default"} />
+          <MetricCard label="Active campaign budget" value={formatNaira(activeCampaignBudget)} description={`${broadcastClicks.toLocaleString()} broadcast link clicks`} href="/marketing/campaigns" icon={Wallet} />
         </div>
       </section> : null}
 

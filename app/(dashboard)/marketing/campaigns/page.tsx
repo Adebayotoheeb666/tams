@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createMarketingCampaign, getCampaigns } from "@/lib/actions/marketing";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function createCampaignAction(formData: FormData) {
   "use server";

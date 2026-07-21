@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { getTestimonials, submitTestimonialWithSentiment, getTestimonialsBySentiment, approveTestimonial, repostTestimonialToSocial } from "@/lib/actions/marketing";
 import { TestimonialSentimentChart } from "@/components/marketing/testimonial-sentiment-chart";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function createTestimonialAction(formData: FormData) {
   "use server";
