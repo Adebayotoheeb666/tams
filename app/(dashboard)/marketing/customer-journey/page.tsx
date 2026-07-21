@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { advanceCustomerStage, getJourneyMetrics, recordTouchpoint } from "@/lib/actions/marketing";
 import { CustomerJourneyChart } from "@/components/marketing/customer-journey-chart";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function updateJourneyAction(formData: FormData) {
   "use server";

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { getLeadById, updateLead, convertLeadToCustomerRecord } from "@/lib/actions/marketing";
 import { redirect, notFound } from "next/navigation";
 import { format } from "date-fns";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function updateLeadAction(formData: FormData) {
   "use server";

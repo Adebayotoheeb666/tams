@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createLead } from "@/lib/actions/marketing";
 import { redirect } from "next/navigation";
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function createLeadAction(formData: FormData) {
   "use server";
