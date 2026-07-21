@@ -13,20 +13,32 @@ import { count, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   appointments,
+  contentCalendar,
   customers,
+  customerTestimonials,
+  leads,
+  marketingCampaigns,
+  marketingKpis,
   orders,
   products,
   purchaseOrders,
+  referralProgram,
+  whatsappBroadcasts,
 } from "@/lib/db/schema";
 import { formatNaira } from "@/lib/utils";
 import {
   ArrowRight,
+  BarChart3,
   CalendarDays,
   CircleAlert,
   ClipboardList,
   CreditCard,
+  Megaphone,
   Package,
+  Send,
   ShoppingBag,
+  Star,
+  Target,
   Users,
   Wallet,
 } from "lucide-react";
@@ -102,6 +114,7 @@ export default async function DashboardPage() {
   const today = todayDateString();
   const canViewAppointments = role !== "accountant";
   const canViewFinance = role === "owner" || role === "accountant";
+  const canViewMarketing = role === "owner";
   const salesHref = role === "accountant" ? "/finance/pnl" : "/sales";
 
   const [
@@ -117,6 +130,7 @@ export default async function DashboardPage() {
     openPurchaseOrders,
     upcomingAppointments,
     recentOrders,
+    marketingSnapshot,
   ] = await Promise.all([
     db
       .select({
@@ -170,6 +184,17 @@ export default async function DashboardPage() {
       orderBy: [desc(orders.orderDate)],
       limit: 5,
     }),
+    canViewMarketing
+      ? Promise.all([
+          db.select({ count: count() }).from(marketingCampaigns).where(sql`${marketingCampaigns.status} IN ('active', 'scheduled')`),
+          db.select({ count: count() }).from(leads).where(sql`${leads.status} NOT IN ('converted', 'lost')`),
+          db.select({ count: count() }).from(contentCalendar).where(eq(contentCalendar.status, 'scheduled')),
+          db.select({ count: count() }).from(whatsappBroadcasts).where(sql`${whatsappBroadcasts.status} IN ('scheduled', 'sent')`),
+          db.select({ count: count() }).from(customerTestimonials).where(sql`${customerTestimonials.status} IN ('approved', 'featured')`),
+          db.select({ count: count() }).from(referralProgram).where(eq(referralProgram.status, 'completed')),
+          db.select({ count: count() }).from(marketingKpis),
+        ])
+      : Promise.resolve([[], [], [], [], [], [], []]),
   ]);
 
   const todayRevenue = todaySales[0]?.total ?? 0;
@@ -184,6 +209,13 @@ export default async function DashboardPage() {
   const appointmentsToday = todayAppointments[0]?.count ?? 0;
   const pendingAppointmentCount = pendingAppointments[0]?.count ?? 0;
   const openPurchaseOrderCount = openPurchaseOrders[0]?.count ?? 0;
+  const activeCampaignCount = marketingSnapshot[0][0]?.count ?? 0;
+  const openLeadCount = marketingSnapshot[1][0]?.count ?? 0;
+  const scheduledContentCount = marketingSnapshot[2][0]?.count ?? 0;
+  const activeBroadcastCount = marketingSnapshot[3][0]?.count ?? 0;
+  const approvedTestimonialCount = marketingSnapshot[4][0]?.count ?? 0;
+  const completedReferralCount = marketingSnapshot[5][0]?.count ?? 0;
+  const loggedKpiCount = marketingSnapshot[6][0]?.count ?? 0;
 
   return (
     <div className="space-y-8">
@@ -211,6 +243,25 @@ export default async function DashboardPage() {
           <MetricCard label="Recent transactions" value={recentOrders.length} description="Latest recorded sales" href={salesHref} icon={ShoppingBag} />
         </div>
       </section>
+
+      {canViewMarketing ? <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">Platform marketing snapshot</h2>
+            <p className="text-sm text-muted-foreground">Live activity across campaigns, social content, customer engagement, and growth.</p>
+          </div>
+          <Link href="/marketing/analytics" className="text-sm font-medium text-primary hover:underline">View analytics</Link>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Active campaigns" value={activeCampaignCount} description="Live and scheduled campaigns" href="/marketing/campaigns" icon={Megaphone} tone={activeCampaignCount > 0 ? "success" : "default"} />
+          <MetricCard label="Open leads" value={openLeadCount} description="Leads still progressing to conversion" href="/marketing/leads" icon={Users} tone={openLeadCount > 0 ? "warning" : "success"} />
+          <MetricCard label="Scheduled content" value={scheduledContentCount} description="Posts queued across your channels" href="/marketing/content-calendar" icon={CalendarDays} />
+          <MetricCard label="Active broadcasts" value={activeBroadcastCount} description="WhatsApp messages scheduled or sent" href="/marketing/broadcasts" icon={Send} />
+          <MetricCard label="Approved testimonials" value={approvedTestimonialCount} description="Social proof ready to share" href="/marketing/testimonials" icon={Star} tone={approvedTestimonialCount > 0 ? "success" : "default"} />
+          <MetricCard label="Completed referrals" value={completedReferralCount} description="Referral conversions and rewards" href="/marketing/referrals" icon={Target} tone={completedReferralCount > 0 ? "success" : "default"} />
+          <MetricCard label="KPIs logged" value={loggedKpiCount} description="Platform metrics available for review" href="/marketing/analytics" icon={BarChart3} />
+        </div>
+      </section> : null}
 
       <section className="space-y-3">
         <div>
