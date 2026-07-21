@@ -421,6 +421,34 @@ export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type PurchaseOrderLine = typeof purchaseOrderLines.$inferSelect;
 export type Refund = typeof refunds.$inferSelect;
 
+export const socialPosts = sqliteTable("social_posts", {
+  id: text("id").primaryKey(),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id),
+  platform: text("platform", { enum: ["instagram", "tiktok", "youtube"] }).notNull(),
+  caption: text("caption").notNull(),
+  imageUrl: text("image_url"),
+  hashtags: text("hashtags"),
+  scheduledAt: text("scheduled_at").notNull(),
+  status: text("status", { enum: ["scheduled", "posting", "posted", "failed"] })
+    .notNull()
+    .default("scheduled"),
+  externalId: text("external_id"),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const socialPostsRelations = relations(socialPosts, ({ one }) => ({
+  createdByUser: one(users, {
+    fields: [socialPosts.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export type SocialPost = typeof socialPosts.$inferSelect;
+
 export const exportJobs = sqliteTable("export_jobs", {
   id: text("id").primaryKey(),
   jobType: text("job_type").notNull(),
@@ -459,4 +487,334 @@ export const auditLogs = sqliteTable("audit_logs", {
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+}));
+
+export const automationSettings = sqliteTable("automation_settings", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  category: text("category").notNull(),
+  label: text("label").notNull(),
+  description: text("description"),
+  type: text("type", { enum: ["boolean", "number", "text", "time"] }).notNull(),
+  value: text("value").notNull(),
+  defaultValue: text("default_value").notNull(),
+  minValue: text("min_value"),
+  maxValue: text("max_value"),
+  options: text("options"),
+  enabled: integer("enabled").notNull().default(1),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export type AutomationSetting = typeof automationSettings.$inferSelect;
+export type AutomationSettingInsert = typeof automationSettings.$inferInsert;
+
+// ============ MARKETING TABLES ============
+
+export const marketingCampaigns = sqliteTable("marketing_campaigns", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status", {
+    enum: ["draft", "scheduled", "active", "completed", "paused"],
+  })
+    .notNull()
+    .default("draft"),
+  campaignType: text("campaign_type", {
+    enum: ["product_launch", "flash_sale", "referral", "seasonal", "awareness"],
+  }).notNull(),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  targetPlatforms: text("target_platforms").notNull(), // JSON array: ['instagram', 'tiktok', 'whatsapp']
+  goalDescription: text("goal_description"),
+  budgetAllocation: integer("budget_allocation").default(0),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const contentCalendar = sqliteTable("content_calendar", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id").references(() => marketingCampaigns.id),
+  platform: text("platform", {
+    enum: ["instagram", "tiktok", "youtube", "whatsapp", "email"],
+  }).notNull(),
+  contentType: text("content_type", {
+    enum: ["product_showcase", "behind_the_scenes", "social_proof", "tutorial", "engagement", "offer", "story"],
+  }).notNull(),
+  title: text("title").notNull(),
+  caption: text("caption"),
+  contentUrl: text("content_url"), // cloudinary link
+  scheduledDate: text("scheduled_date"),
+  postedDate: text("posted_date"),
+  status: text("status", {
+    enum: ["draft", "scheduled", "posted", "cancelled"],
+  })
+    .notNull()
+    .default("draft"),
+  hashtags: text("hashtags"), // JSON array
+  targetAudience: text("target_audience"),
+  expectedReach: integer("expected_reach").default(0),
+  actualReach: integer("actual_reach").default(0),
+  engagementRate: integer("engagement_rate").default(0), // percentage * 100
+  callToAction: text("call_to_action"),
+  bufferPostId: text("buffer_post_id"),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const leads = sqliteTable("leads", {
+  id: text("id").primaryKey(),
+  source: text("source", {
+    enum: ["instagram_dm", "tiktok_comment", "whatsapp", "youtube_comment", "campus_popup", "referral", "other"],
+  }).notNull(),
+  sourceUrl: text("source_url"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  email: text("email"),
+  phone: text("phone"),
+  whatsappNumber: text("whatsapp_number"),
+  interestedIn: text("interested_in"), // JSON array: ['thrift', 'nails']
+  initialMessage: text("initial_message"),
+  leadScore: integer("lead_score").default(0), // 0-100
+  status: text("status", {
+    enum: ["new", "contacted", "interested", "converted", "lost", "nurturing"],
+  })
+    .notNull()
+    .default("new"),
+  assignedTo: text("assigned_to").references(() => users.id),
+  campaignId: text("campaign_id").references(() => marketingCampaigns.id),
+  convertedCustomerId: text("converted_customer_id").references(() => customers.id),
+  conversionDate: text("conversion_date"),
+  followUpDate: text("follow_up_date"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const customerJourney = sqliteTable("customer_journey", {
+  id: text("id").primaryKey(),
+  customerId: text("customer_id").references(() => customers.id),
+  leadId: text("lead_id").references(() => leads.id),
+  stage: text("stage", {
+    enum: ["awareness", "interest", "desire", "action", "loyalty"],
+  })
+    .notNull()
+    .default("awareness"),
+  stageEnteredAt: text("stage_entered_at").notNull(),
+  touchpoints: text("touchpoints"), // JSON array of touchpoint ids
+  lastInteraction: text("last_interaction"),
+  lastInteractionDate: text("last_interaction_date"),
+  lifetimeValue: integer("lifetime_value").default(0),
+  nextAction: text("next_action"),
+  nextActionDate: text("next_action_date"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const customerTestimonials = sqliteTable("customer_testimonials", {
+  id: text("id").primaryKey(),
+  customerId: text("customer_id").references(() => customers.id),
+  productId: text("product_id").references(() => products.id),
+  rating: integer("rating").notNull(), // 1-5
+  textReview: text("text_review"),
+  imageUrl: text("image_url"), // cloudinary link
+  platformShared: text("platform_shared", {
+    enum: ["instagram", "tiktok", "whatsapp", "in_person"],
+  }).notNull(),
+  status: text("status", {
+    enum: ["pending_approval", "approved", "featured", "archived"],
+  })
+    .notNull()
+    .default("pending_approval"),
+  featuredUntil: text("featured_until"),
+  engagementCount: integer("engagement_count").default(0),
+  approvedBy: text("approved_by").references(() => users.id),
+  approvedAt: text("approved_at"),
+  sentiment: text("sentiment", { enum: ["positive", "neutral", "negative"] }),
+  sentimentScore: integer("sentiment_score"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const referralProgram = sqliteTable("referral_program", {
+  id: text("id").primaryKey(),
+  referrerCustomerId: text("referrer_customer_id").references(() => customers.id),
+  referredCustomerId: text("referred_customer_id").references(() => customers.id),
+  referralCode: text("referral_code").notNull().unique(),
+  status: text("status", {
+    enum: ["pending", "completed", "failed"],
+  })
+    .notNull()
+    .default("pending"),
+  rewardGivenAmount: integer("reward_given_amount").default(0),
+  rewardGivenDate: text("reward_given_date"),
+  referralDate: text("referral_date").notNull(),
+  conversionDate: text("conversion_date"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const broadcastListMembers = sqliteTable("broadcast_list_members", {
+  id: text("id").primaryKey(),
+  customerId: text("customer_id").references(() => customers.id),
+  whatsappNumber: text("whatsapp_number").notNull(),
+  firstName: text("first_name"),
+  segment: text("segment", {
+    enum: ["vip", "repeat_customer", "new_customer", "inactive", "all"],
+  })
+    .notNull()
+    .default("all"),
+  status: text("status", {
+    enum: ["active", "unsubscribed", "bounced"],
+  })
+    .notNull()
+    .default("active"),
+  consentGiven: integer("consent_given").notNull().default(1),
+  consentDate: text("consent_date"),
+  lastBroadcastDate: text("last_broadcast_date"),
+  broadcastsReceivedCount: integer("broadcasts_received_count").default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const whatsappBroadcasts = sqliteTable("whatsapp_broadcasts", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id").references(() => marketingCampaigns.id),
+  broadcastText: text("broadcast_text").notNull(),
+  broadcastImageUrl: text("broadcast_image_url"),
+  recipientsSegment: text("recipients_segment").notNull(), // 'vip', 'repeat_customer', 'all'
+  totalRecipients: integer("total_recipients").default(0),
+  sentCount: integer("sent_count").default(0),
+  readCount: integer("read_count").default(0),
+  clickCount: integer("click_count").default(0),
+  scheduledDate: text("scheduled_date"),
+  sentDate: text("sent_date"),
+  status: text("status", {
+    enum: ["draft", "scheduled", "sent", "failed"],
+  })
+    .notNull()
+    .default("draft"),
+  isABTest: integer("is_ab_test").notNull().default(0),
+  parentBroadcastId: text("parent_broadcast_id"),
+  variantLabel: text("variant_label"),
+  winnerVariant: text("winner_variant"),
+  bufferPostId: text("buffer_post_id"),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const marketingKpis = sqliteTable("marketing_kpis", {
+  id: text("id").primaryKey(),
+  metricName: text("metric_name").notNull(), // 'instagram_followers', 'tiktok_views', etc.
+  metricValue: integer("metric_value").notNull(),
+  targetValue: integer("target_value"),
+  period: text("period", {
+    enum: ["daily", "weekly", "monthly", "6_month"],
+  }).notNull(),
+  periodStartDate: text("period_start_date").notNull(),
+  periodEndDate: text("period_end_date"),
+  platform: text("platform"), // 'instagram', 'tiktok', 'overall'
+  dataSource: text("data_source"), // 'api_pull', 'manual_entry', 'calculated'
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// ============ RELATIONS ============
+
+export const marketingCampaignsRelations = relations(marketingCampaigns, ({ one, many }) => ({
+  createdByUser: one(users, {
+    fields: [marketingCampaigns.createdBy],
+    references: [users.id],
+  }),
+  contentCalendarItems: many(contentCalendar),
+  leads: many(leads),
+  broadcasts: many(whatsappBroadcasts),
+}));
+
+export const contentCalendarRelations = relations(contentCalendar, ({ one }) => ({
+  campaign: one(marketingCampaigns, {
+    fields: [contentCalendar.campaignId],
+    references: [marketingCampaigns.id],
+  }),
+  createdByUser: one(users, {
+    fields: [contentCalendar.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const leadsRelations = relations(leads, ({ one }) => ({
+  campaign: one(marketingCampaigns, {
+    fields: [leads.campaignId],
+    references: [marketingCampaigns.id],
+  }),
+  assignedUser: one(users, {
+    fields: [leads.assignedTo],
+    references: [users.id],
+  }),
+  convertedCustomer: one(customers, {
+    fields: [leads.convertedCustomerId],
+    references: [customers.id],
+  }),
+  journey: one(customerJourney, {
+    fields: [leads.id],
+    references: [customerJourney.leadId],
+  }),
+}));
+
+export const customerJourneyRelations = relations(customerJourney, ({ one }) => ({
+  customer: one(customers, {
+    fields: [customerJourney.customerId],
+    references: [customers.id],
+  }),
+  lead: one(leads, {
+    fields: [customerJourney.leadId],
+    references: [leads.id],
+  }),
+}));
+
+export const customerTestimonialsRelations = relations(customerTestimonials, ({ one }) => ({
+  customer: one(customers, {
+    fields: [customerTestimonials.customerId],
+    references: [customers.id],
+  }),
+  product: one(products, {
+    fields: [customerTestimonials.productId],
+    references: [products.id],
+  }),
+  approvedByUser: one(users, {
+    fields: [customerTestimonials.approvedBy],
+    references: [users.id],
+  }),
+}));
+
+export const referralProgramRelations = relations(referralProgram, ({ one }) => ({
+  referrerCustomer: one(customers, {
+    fields: [referralProgram.referrerCustomerId],
+    references: [customers.id],
+  }),
+  referredCustomer: one(customers, {
+    fields: [referralProgram.referredCustomerId],
+    references: [customers.id],
+  }),
+}));
+
+export const broadcastListMembersRelations = relations(broadcastListMembers, ({ one }) => ({
+  customer: one(customers, {
+    fields: [broadcastListMembers.customerId],
+    references: [customers.id],
+  }),
+}));
+
+export const whatsappBroadcastsRelations = relations(whatsappBroadcasts, ({ one }) => ({
+  campaign: one(marketingCampaigns, {
+    fields: [whatsappBroadcasts.campaignId],
+    references: [marketingCampaigns.id],
+  }),
+  createdByUser: one(users, {
+    fields: [whatsappBroadcasts.createdBy],
+    references: [users.id],
+  }),
 }));

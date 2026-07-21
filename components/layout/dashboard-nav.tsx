@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -14,6 +15,9 @@ import {
   BarChart3,
   LogOut,
   Scissors,
+  Megaphone,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,7 @@ const navItems = [
   { href: "/sales", label: "Sales", icon: ShoppingCart, roles: ["owner", "staff"] as UserRole[] },
   { href: "/appointments", label: "Appointments", icon: Calendar, roles: ["owner", "staff"] as UserRole[] },
   { href: "/services", label: "Services", icon: Scissors, roles: ["owner"] as UserRole[] },
+  { href: "/marketing", label: "Marketing", icon: Megaphone, roles: ["owner"] as UserRole[] },
   { href: "/exports", label: "Exports", icon: Download, roles: ["owner", "staff", "accountant"] as UserRole[] },
   { href: "/finance", label: "Finance", icon: BarChart3, roles: ["owner", "accountant"] as UserRole[] },
   { href: "/bookkeeping/ledger", label: "Ledger", icon: BookOpen, roles: ["owner", "accountant"] as UserRole[] },
@@ -47,6 +52,27 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const visibleItems = navItems.filter((item) => item.roles.includes(userRole));
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const currentTheme =
+      storedTheme === "light" || storedTheme === "dark"
+        ? storedTheme
+        : prefersDark
+        ? "dark"
+        : "light";
+    document.documentElement.classList.toggle("dark", currentTheme === "dark");
+    setTheme(currentTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    window.localStorage.setItem("theme", nextTheme);
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    setTheme(nextTheme);
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -55,7 +81,20 @@ export function DashboardShell({
           <Link href="/" className="font-semibold text-primary">
             TBH-IMS
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="text-muted-foreground"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </Button>
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {userName}
             </span>

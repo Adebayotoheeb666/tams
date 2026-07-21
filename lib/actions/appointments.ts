@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import {
   accounts,
   appointments,
+  broadcastListMembers,
   journalEntries,
   journalEntryLines,
   services,
@@ -18,9 +19,15 @@ import {
   updateAppointmentStatusSchema,
 } from "@/lib/validations/appointments";
 import { addMinutesToTime, nowIso, todayDateString } from "@/lib/utils";
+import {
+  buildAppointmentMessage,
+  getAppointmentMarketingSegment,
+  normalizeWhatsappNumber,
+} from "@/lib/utils/marketing/appointment-marketing";
 import { and, asc, count, eq, gte, inArray, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { isPeriodLocked } from "@/lib/actions/bookkeeping";
+import { forwardToN8nWebhook } from "@/lib/integrations/n8n";
 
 type ActionResult<T> =
   | { success: true; data: T }
@@ -94,6 +101,89 @@ async function recordServiceRevenue(
       description: label,
     },
   ]);
+}
+
+async function enrollAppointmentMarketingContact(input: {
+  customerName: string;
+  customerPhone: string;
+  priceNaira?: number;
+}) {
+  const normalizedPhone = normalizeWhatsappNumber(input.customerPhone);
+  if (!normalizedPhone) return;
+
+  const segment = getAppointmentMarketingSegment(input.priceNaira);
+  const existing = await db.query.broadcastListMembers.findFirst({
+    where: eq(broadcastListMembers.whatsappNumber, normalizedPhone),
+  });
+
+  const now = nowIso();
+  const values = {
+    id: existing?.id || crypto.randomUUID(),
+    customerId: null,
+    whatsappNumber: normalizedPhone,
+    firstName: input.customerName || null,
+    segment,
+    status: "active" as const,
+    consentGiven: 1,
+    consentDate: now,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  };
+
+  if (existing) {
+    await db.update(broadcastListMembers).set(values).where(eq(broadcastListMembers.id, existing.id));
+    return;
+  }
+
+  await db.insert(broadcastListMembers).values(values as any);
+}
+
+async function sendAppointmentMarketingMessage(input: {
+  customerName: string;
+  customerPhone: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  serviceName: string;
+  type: "confirmation" | "reminder";
+}) {
+  const normalizedPhone = normalizeWhatsappNumber(input.customerPhone);
+  if (!normalizedPhone) return;
+
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_WHATSAPP_NUMBER;
+
+  if (!sid || !token || !from) {
+    console.log("Twilio not configured; skipping appointment marketing message.");
+    return;
+  }
+
+  const message = buildAppointmentMessage(input.type, {
+    customerName: input.customerName,
+    appointmentDate: input.appointmentDate,
+    appointmentTime: input.appointmentTime,
+    serviceName: input.serviceName,
+  });
+
+  const auth = Buffer.from(`${sid}:${token}`).toString("base64");
+  const body = new URLSearchParams({
+    From: `whatsapp:${from}`,
+    To: `whatsapp:${normalizedPhone}`,
+    Body: message,
+  });
+
+  const response = await fetch("https://api.twilio.com/2010-04-01/Accounts/" + sid + "/Messages.json", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Twilio rejected the appointment message with status ${response.status}`);
+  }
 }
 
 export async function getServices(): Promise<Service[]> {
@@ -196,6 +286,25 @@ export async function bookAppointment(
     createdAt: nowIso(),
   });
 
+  try {
+    await enrollAppointmentMarketingContact({
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      priceNaira: priceCharged,
+    });
+
+    await sendAppointmentMarketingMessage({
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      appointmentDate: data.appointmentDate,
+      appointmentTime: data.startTime,
+      serviceName: service.name,
+      type: "confirmation",
+    });
+  } catch (error) {
+    console.error("Failed to send appointment confirmation marketing message:", error);
+  }
+
   // Schedule reminder for 24 hours before appointment
   try {
     const appointmentDateTime = new Date(`${data.appointmentDate}T${data.startTime}`);
@@ -203,7 +312,8 @@ export async function bookAppointment(
     const now = new Date();
 
     if (reminderTime > now) {
-      await triggerClient.triggerEvent("appointment.reminder-scheduled", {
+      const { TRIGGER_EVENTS } = await import("@/trigger/client");
+      await triggerClient.triggerEvent(TRIGGER_EVENTS.APPOINTMENTS_REMINDERS_SEND, {
         appointmentId: id,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
@@ -215,6 +325,24 @@ export async function bookAppointment(
     }
   } catch (error) {
     console.error("Failed to schedule appointment reminder:", error);
+  }
+
+  try {
+    await forwardToN8nWebhook(process.env.N8N_APPOINTMENT_PATH ?? "/webhook/appointment-booked", {
+      event: "appointment.booked",
+      appointment: {
+        id,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        serviceId: data.serviceId,
+        appointmentDate: data.appointmentDate,
+        startTime: data.startTime,
+        status: "booked",
+        notes: data.notes || null,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to forward appointment booking to n8n:", error);
   }
 
   revalidatePath("/appointments");
@@ -285,7 +413,8 @@ export async function updateAppointmentStatus(
         const now = new Date();
 
         if (reminderTime > now) {
-          await triggerClient.triggerEvent("appointment.confirmed", {
+          const { TRIGGER_EVENTS } = await import("@/trigger/client");
+          await triggerClient.triggerEvent(TRIGGER_EVENTS.APPOINTMENTS_CONFIRMATIONS_SEND, {
             appointmentId,
             customerName: appointment.customerName,
             customerPhone: appointment.customerPhone,
@@ -295,8 +424,41 @@ export async function updateAppointmentStatus(
             reminderTime: reminderTime.toISOString(),
           });
         }
+
+        await enrollAppointmentMarketingContact({
+          customerName: appointment.customerName,
+          customerPhone: appointment.customerPhone,
+          priceNaira: appointment.priceCharged,
+        });
+
+        await sendAppointmentMarketingMessage({
+          customerName: appointment.customerName,
+          customerPhone: appointment.customerPhone,
+          appointmentDate: appointment.appointmentDate,
+          appointmentTime: appointment.startTime,
+          serviceName: appointment.service.name,
+          type: "confirmation",
+        });
       } catch (error) {
         console.error("Failed to trigger confirmation reminder:", error);
+      }
+
+      try {
+        await forwardToN8nWebhook(process.env.N8N_APPOINTMENT_PATH ?? "/webhook/appointment-booked", {
+          event: "appointment.confirmed",
+          appointment: {
+            id: appointmentId,
+            customerName: appointment.customerName,
+            customerPhone: appointment.customerPhone,
+            serviceId: appointment.serviceId,
+            appointmentDate: appointment.appointmentDate,
+            startTime: appointment.startTime,
+            status: "confirmed",
+            notes: appointment.notes,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to forward appointment confirmation to n8n:", error);
       }
     }
   }

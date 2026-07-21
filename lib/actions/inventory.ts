@@ -19,6 +19,7 @@ import { parseProductsCsv } from "@/lib/inventory/csv";
 import { nairaToKobo, nowIso } from "@/lib/utils";
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { forwardToN8nWebhook } from "@/lib/integrations/n8n";
 
 type ActionResult<T> =
   | { success: true; data: T }
@@ -395,7 +396,8 @@ export async function adjustStock(
   // Trigger low-stock alert if product fell below reorder level
   if (updated && updated.quantity <= updated.reorderLevel && product.quantity > product.reorderLevel) {
     try {
-      await triggerClient.triggerEvent("inventory.low-stock", {
+      const { TRIGGER_EVENTS } = await import("@/trigger/client");
+      await triggerClient.triggerEvent(TRIGGER_EVENTS.INVENTORY_ALERTS_LOW_STOCK, {
         productId: updated.id,
         productName: updated.name,
         currentQuantity: updated.quantity,
@@ -403,6 +405,22 @@ export async function adjustStock(
       });
     } catch (error) {
       console.error("Failed to trigger low-stock event:", error);
+    }
+
+    try {
+      await forwardToN8nWebhook(process.env.N8N_LOW_STOCK_PATH ?? "/webhook/low-stock", {
+        event: "inventory.low-stock",
+        product: {
+          id: updated.id,
+          name: updated.name,
+          sku: updated.sku,
+          quantity: updated.quantity,
+          reorderLevel: updated.reorderLevel,
+          businessUnit: updated.businessUnit,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to forward low-stock event to n8n:", error);
     }
   }
 

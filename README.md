@@ -58,6 +58,20 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with:
 | `npm run db:seed` | Seed owner, COA, categories |
 | `npm run db:studio` | Open Drizzle Studio |
 
+## Docker + local automation
+
+To run the app and the local automation service together:
+
+```bash
+docker compose up --build
+```
+
+- The app is exposed at `http://localhost:3000`
+- The automation service is exposed at `http://localhost:4000/health`
+- Webhooks and business automation are handled locally inside this repo via the dedicated automation service
+- Set `AUTOMATION_WEBHOOK_BASE_URL=http://automation:4000` and optionally `N8N_WEBHOOK_BASE_URL=http://automation:4000` for compatibility
+- Social posts can now be scheduled through the automation service via `POST /api/social/posts` and processed automatically by the worker loop
+
 ## Turso (production)
 
 1. Create databases at [turso.tech](https://turso.tech)

@@ -9,6 +9,7 @@ import {
 } from "@/lib/accounting/accounts";
 import { db } from "@/lib/db";
 import { triggerClient } from "@/trigger/client";
+import { autoAddToBroadcastList } from "@/lib/actions/marketing";
 import {
   accounts,
   journalEntries,
@@ -18,6 +19,7 @@ import {
   products,
   refunds,
   stockMovements,
+  customers,
   type Order,
   type OrderItem,
   type Product,
@@ -32,6 +34,7 @@ import { nairaToKobo, nowIso, todayDateString, type BusinessUnit } from "@/lib/u
 import { isPeriodLocked, logAudit } from "@/lib/actions/bookkeeping";
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { forwardToN8nWebhook } from "@/lib/integrations/n8n";
 
 type ActionResult<T> =
   | { success: true; data: T }
@@ -372,7 +375,8 @@ export async function createSale(
       });
       if (updatedProduct && updatedProduct.quantity <= updatedProduct.reorderLevel && product.quantity > product.reorderLevel) {
         try {
-          await triggerClient.triggerEvent("inventory.low-stock", {
+          const { TRIGGER_EVENTS } = await import("@/trigger/client");
+          await triggerClient.triggerEvent(TRIGGER_EVENTS.INVENTORY_ALERTS_LOW_STOCK, {
             productId: product.id,
             productName: product.name,
             currentQuantity: updatedProduct.quantity,
@@ -381,6 +385,46 @@ export async function createSale(
         } catch (error) {
           console.error("Failed to trigger low-stock event:", error);
         }
+      }
+    }
+
+    try {
+      await forwardToN8nWebhook(process.env.N8N_SALES_PATH ?? "/webhook/sale-completed", {
+        event: "sale.completed",
+        sale: {
+          id: result.order.id,
+          receiptNumber: result.order.receiptNumber,
+          totalAmount: result.order.totalAmount,
+          paymentMethod,
+          discountAmount,
+          itemCount: result.items.length,
+          customerId: customerId || null,
+          createdBy: session.user.id,
+          createdAt: result.order.createdAt,
+        },
+        items: result.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        })),
+      });
+    } catch (error) {
+      console.error("Failed to forward sale to n8n:", error);
+    }
+
+    // Auto-add customer to broadcast list after order if they have a phone
+    if (customerId) {
+      try {
+        const customer = await db.query.customers.findFirst({
+          where: eq(customers.id, customerId),
+        });
+        if (customer && customer.phone) {
+          await autoAddToBroadcastList(customerId, customer.phone, customer.name);
+        }
+      } catch (error) {
+        console.error("Failed to auto-add customer to broadcast list:", error);
       }
     }
 

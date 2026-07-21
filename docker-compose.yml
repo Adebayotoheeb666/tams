@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tbh-ims-app
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      AUTH_URL: http://localhost:3000
+      N8N_WEBHOOK_BASE_URL: http://automation:4000
+      N8N_WEBHOOK_PATH: /webhook/whatsapp-inbound
+      AUTOMATION_WEBHOOK_BASE_URL: http://automation:4000
+      AUTOMATION_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - automation
+    command: ["npm", "run", "start"]
+
+  automation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tbh-ims-automation
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      AUTOMATION_PORT: 4000
+      AUTOMATION_HOST: 0.0.0.0
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      AUTOMATION_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:-}
+    ports:
+      - "4000:4000"
+    command: ["npm", "run", "automation"]

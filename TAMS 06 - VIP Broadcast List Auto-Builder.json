@@ -1,0 +1,2857 @@
+{
+  "name": "TAMS 06 - VIP Broadcast List Auto-Builder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7cb4793f-abfc-4e7f-b2ef-cd7f97f99f71",
+      "name": "WhatsApp Inbound Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        112
+      ],
+      "webhookId": "ef1b3600-d1e1-445a-b756-782a065615b8",
+      "notes": "Receives inbound WhatsApp messages via Twilio/Meta Cloud API webhook. Configure your WhatsApp provider to POST to this URL."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\n// Twilio format\nconst from = body.From || body.from || '';\nconst msgBody = (body.Body || body.body || body.text || '').toLowerCase();\nconst name = body.ProfileName || body.profile_name || 'Babe';\n\n// Keyword detection\nconst keywords = {\n  nails: ['nail', 'glitz', 'press-on', 'manicure', 'pedicure', 'gel', 'acrylic'],\n  thrift: ['thrift', 'shirt', 'top', 'crop', 'bodycon', 'shorts', 'cloth', 'outfit', 'wear', 'fashion', 'dress'],\n  price: ['price', 'cost', 'how much', 'rate', 'fee', 'charge', 'naira', '₦'],\n  order: ['order', 'buy', 'purchase', 'want', 'get', 'available', 'stock', 'book', 'appointment'],\n  combo: ['both', 'all', 'everything', 'combo']\n};\n\nconst detected = {};\nfor (const [cat, words] of Object.entries(keywords)) {\n  detected[cat] = words.some(w => msgBody.includes(w));\n}\n\nconst isNewEnquiry = Object.values(detected).some(Boolean) || msgBody.length < 30;\n\nreturn [{\n  json: {\n    from,\n    name,\n    msgBody,\n    detected,\n    isNewEnquiry,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "7223e0b2-7dd4-4b72-83d2-173bf95a96e4",
+      "name": "Parse Message & Detect Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.isNewEnquiry }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "82af15f7-bfbc-45ad-b948-3887eb708b66",
+      "name": "Is New Enquiry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { from, name, detected } = $input.first().json;\n\nlet message = '';\n\nif (detected.nails && !detected.thrift) {\n  message = `Hi ${name}! 💅✨ Welcome to *Tams Beauty Hub* — your go-to for gorgeous nails on a student budget!\\n\\nOur *Glitz Nails* services:\\n💅 Press-On Nail Sets — affordable per collection\\n🎨 Nail Painting — budget-friendly per session\\n✨ Nail Cleaning & Maintenance\\n\\nTo book or get a price, just tell us:\\n1️⃣ Which service you want\\n2️⃣ Your preferred date/time\\n\\nWe'll sort you out! 💕`;\n} else if (detected.thrift && !detected.nails) {\n  message = `Hi ${name}! 👗✨ Welcome to *Tams Beauty Hub* — where students slay on a budget!\\n\\n*Tams Thrift* collection:\\n👕 Corporate Shirts — ₦2,000–₦3,500\\n👚 Basic & Crop Tops — ₦2,000–₦3,000\\n🩱 Bodycon Tops — ₦2,500–₦3,500\\n🩳 Shorts & Bottoms — ₦2,500–₦4,000\\n\\nAll pieces hand-selected for quality 🔥\\n\\nTo order, just tell us what you want and we'll send photos! 💕`;\n} else {\n  message = `Hi ${name}! 💓 Welcome to *Tams Beauty Hub* — your one-stop for style and glam on campus!\\n\\nWe offer:\\n👗 *Tams Thrift* — Tops, Shirts, Shorts (₦2,000–₦4,000)\\n💅 *Glitz Nails* — Press-ons, Nail Art & Maintenance\\n\\nWhat are you looking to get today?\\n\\n1️⃣ Thrift fashion\\n2️⃣ Nail services\\n3️⃣ Both! 😍\\n\\nJust reply and we'll hook you up! 🔥`;\n}\n\nreturn [{ json: { to: from, message } }];"
+      },
+      "id": "e5512d04-4ffc-4769-970f-9c028b92430a",
+      "name": "Build Welcome Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $json.to }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af9f2447-8d27-4c99-a285-edc534c984d8",
+      "name": "Send WhatsApp Welcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      },
+      "notes": "Uses Twilio. Replace with Meta Cloud API if preferred. Set TWILIO_ACCOUNT_SID and TWILIO_WHATSAPP_NUMBER in n8n variables."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Parse Message & Detect Intent').item.json.timestamp }}",
+            "WhatsApp Number": "={{ $('Parse Message & Detect Intent').item.json.from }}",
+            "Name": "={{ $('Parse Message & Detect Intent').item.json.name }}",
+            "Message": "={{ $('Parse Message & Detect Intent').item.json.msgBody }}",
+            "Interest": "={{ Object.entries($('Parse Message & Detect Intent').item.json.detected).filter(([k,v])=>v).map(([k])=>k).join(', ') }}",
+            "Status": "New Lead",
+            "Converted": "No",
+            "Follow Up Sent": "No",
+            "Source": "WhatsApp Inbound"
+          }
+        },
+        "options": {}
+      },
+      "id": "778005a7-3386-4342-a605-cd5beb910b84",
+      "name": "Log Lead to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Logs every new lead. Set LEADS_SHEET_ID in n8n variables. Sheet must have columns: Date, WhatsApp Number, Name, Message, Interest, Status, Converted, Follow Up Sent, Source"
+    },
+    {
+      "parameters": {
+        "amount": 24
+      },
+      "id": "f075c281-0a9c-49b8-9d6b-92e7de488c88",
+      "name": "Wait 24 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        448,
+        192
+      ],
+      "webhookId": "41093ae3-a9c9-4ed9-bf8d-d02ebd02aaa4"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "WhatsApp Number",
+              "lookupValue": "={{ $('Parse Message & Detect Intent').item.json.from }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8f3afd07-9abf-4992-9aba-e1116d5138fe",
+      "name": "Check If Converted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.Converted }}",
+              "rightValue": "No",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c8752b1d-c91f-4f0e-89c6-4d733a81290c",
+      "name": "Still Not Converted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $('Parse Message & Detect Intent').item.json.from }}"
+            },
+            {
+              "name": "Body",
+              "value": "Hey {{ $('Parse Message & Detect Intent').item.json.name }}! 💕 Just checking back in — did you get a chance to look at our collection? We have some stunning pieces right now and would love to sort you out 😍\\n\\nReply anytime to order or ask questions. We're always here! 🌸"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1a94915-42c4-41ff-b0e8-d6af200087a1",
+      "name": "Send 24hr Follow-Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        112
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Follow Up Sent": "Yes",
+            "Status": "Followed Up"
+          }
+        },
+        "options": {}
+      },
+      "id": "7449ed43-9bdb-4c16-8e4e-cbb9c4ad558e",
+      "name": "Mark Follow-Up Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1104,
+        272
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\"}",
+        "options": {}
+      },
+      "id": "b073b566-54b9-4745-b372-c480c39dd4cd",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "c27b9f4a-541c-409d-b4e1-d426df2398a5",
+      "name": "Daily 8am Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        368
+      ],
+      "notes": "Runs every day at 8:00am. Adjust timezone in n8n settings to Africa/Lagos."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1RT9sCwgWB14GLtpUU7mlb_Yz_Qz5Gh7WK1cHmD5nn7M",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RT9sCwgWB14GLtpUU7mlb_Yz_Qz5Gh7WK1cHmD5nn7M/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "7b43ab04-8d08-4e91-ac39-397d06e6c4bd",
+      "name": "Fetch Today's Content",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -16,
+        368
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Reads rows from Content Calendar sheet where Scheduled Date = today AND Status = Scheduled. Required columns: Scheduled Date, Platform, Caption, Image URL, Hashtags, Status, Posted At"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $items().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c144a521-32bf-4af4-804c-ddcaf3e11bcf",
+      "name": "Any Posts Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        208,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "Platform",
+        "options": {}
+      },
+      "id": "fa5799f6-dc75-464b-a55a-682414e281a8",
+      "name": "Split by Platform",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        432,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.Platform }}",
+              "rightValue": "Instagram",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f1e498fb-4b4d-4fa5-8b5f-b57b83439fbb",
+      "name": "Is Instagram?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        656,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c3",
+              "leftValue": "={{ $json.Platform }}",
+              "rightValue": "TikTok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b9a1eae3-827c-49bb-9cf5-b5d5901cf9f6",
+      "name": "Is TikTok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        656,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c4",
+              "leftValue": "={{ $json.Platform }}",
+              "rightValue": "WhatsApp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d340bc38-e1f0-42dd-9605-e4e50878c3ef",
+      "name": "Is WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        656,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "profile_ids[]",
+              "value": "={{ $vars.BUFFER_INSTAGRAM_PROFILE_ID }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.Caption }} {{ $json.Hashtags }}"
+            },
+            {
+              "name": "media[photo]",
+              "value": "={{ $json['Image URL'] }}"
+            },
+            {
+              "name": "scheduled_at",
+              "value": "={{ $json['Scheduled Date'] }}T{{ $json['Scheduled Time'] || '08:00' }}:00+01:00"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "813fa033-3a9c-40f4-833f-8764a2f45336",
+      "name": "Schedule on Buffer (Instagram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        128
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      },
+      "notes": "Posts to Instagram via Buffer API. Set BUFFER_INSTAGRAM_PROFILE_ID in n8n variables. Get Buffer access token from buffer.com/developers."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "profile_ids[]",
+              "value": "={{ $vars.BUFFER_TIKTOK_PROFILE_ID }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.Caption }} {{ $json.Hashtags }}"
+            },
+            {
+              "name": "media[photo]",
+              "value": "={{ $json['Image URL'] }}"
+            },
+            {
+              "name": "scheduled_at",
+              "value": "={{ $json['Scheduled Date'] }}T{{ $json['Scheduled Time'] || '08:00' }}:00+01:00"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7021fcdc-c2be-4079-a5d7-f6f5159cb640",
+      "name": "Schedule on Buffer (TikTok)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        336
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      },
+      "notes": "Posts TikTok via Buffer. Set BUFFER_TIKTOK_PROFILE_ID in n8n variables."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $vars.WHATSAPP_BROADCAST_NUMBER }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $json.Caption }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54a01cc2-3b0d-4365-b7a4-04efae169c41",
+      "name": "Send WhatsApp Status/Broadcast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        528
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      },
+      "notes": "Sends to WhatsApp broadcast. For full broadcast list, loop through BROADCAST_SHEET and send to each contact."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.CONTENT_CALENDAR_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Content Calendar",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Posted",
+            "Posted At": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "b1c63902-d433-4c7b-9bce-5908f47ca121",
+      "name": "Mark as Posted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1088,
+        336
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst posted = items.filter(i => i.json.Status === 'Posted' || i.json.postedOk);\n\nconst summary = `✅ Tams Beauty Hub — Daily Post Summary\\n\\nDate: ${new Date().toLocaleDateString('en-NG')}\\nPosts scheduled/sent: ${items.length}\\n\\nPlatforms:\\n${items.map(i => `• ${i.json.Platform}: ${(i.json.Caption || '').slice(0,60)}...`).join('\\n')}\\n\\nAll done! 💅`;\n\nreturn [{ json: { summary } }];"
+      },
+      "id": "d7ad565a-31f3-42ca-8337-bedcb4f10ba4",
+      "name": "Build Daily Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "tamsbeauty17@gmail.com",
+        "subject": "✅ Tams Daily Posts — {{ $today.format('DD MMM YYYY') }}",
+        "message": "HI, Daily summary of today's business",
+        "options": {}
+      },
+      "id": "3770d65b-97e0-4a24-819f-b00ad423d5aa",
+      "name": "Email Daily Summary to Owner",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1536,
+        336
+      ],
+      "webhookId": "34484b52-e2a9-4f15-8f3c-e74a7732a61b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "MxnkcaGti7H7MAm6",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Sends a daily recap email to the owner. Set OWNER_EMAIL in n8n variables."
+    },
+    {
+      "parameters": {
+        "sendTo": "tamsbeauty17@gmail.com",
+        "subject": "📅 Tams — No Posts Scheduled for Today ({{ $today.format('DD MMM YYYY') }})",
+        "message": "HI,content schedule for today",
+        "options": {}
+      },
+      "id": "f97ccb73-d5a7-49eb-a822-4f59d9f911e2",
+      "name": "Email: Nothing Scheduled",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        432,
+        528
+      ],
+      "webhookId": "9631b489-2411-4526-9a5f-c2ed80080787",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "MxnkcaGti7H7MAm6",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-follower",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "45e08b52-b6ff-4d1f-8d8a-dd5674c3f296",
+      "name": "Instagram Follower Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        128,
+        624
+      ],
+      "webhookId": "409b1034-17eb-4ed3-81e6-cdbb53bdb7ea",
+      "notes": "Receives new follower events. Connect via Meta Webhooks (subscribe to 'follow' events on your Instagram Business account) or via Phantombuster's Instagram Follow Monitor."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\n// Handle Meta webhook format\nlet username = '';\nlet userId = '';\n\nif (body.entry) {\n  // Meta Webhooks format\n  const entry = body.entry[0];\n  const change = entry?.changes?.[0];\n  username = change?.value?.username || '';\n  userId = change?.value?.id || entry?.id || '';\n} else if (body.username) {\n  // Phantombuster format\n  username = body.username;\n  userId = body.userId || body.id || '';\n} else {\n  // Generic\n  username = body.from?.username || body.username || 'there';\n  userId = body.from?.id || body.id || '';\n}\n\nconst firstName = username.split('_')[0] || username;\nconst capitalised = firstName.charAt(0).toUpperCase() + firstName.slice(1);\n\nreturn [{\n  json: {\n    username,\n    userId,\n    firstName: capitalised,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "c51c27ce-b3bf-43b8-be63-bcdc0bf38791",
+      "name": "Extract Follower Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Followers",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Instagram Username",
+              "lookupValue": "={{ $json.username }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2dccd080-541c-46c8-90c3-397fa643ae5e",
+      "name": "Check If Already Welcomed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        576,
+        624
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $items().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6039b3e2-49b3-4d92-80d0-68f5d9ca15b7",
+      "name": "New Follower?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        800,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $vars.INSTAGRAM_PAGE_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c3fa47c-f52c-4472-8082-51196a84cc8b",
+      "name": "Send Welcome DM (Instagram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        528
+      ],
+      "notes": "Sends Instagram DM via Meta Graph API. Requires Instagram Business account with messaging enabled. Set INSTAGRAM_PAGE_ACCESS_TOKEN in variables."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Followers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Instagram Username": "={{ $('Extract Follower Details').item.json.username }}",
+            "User ID": "={{ $('Extract Follower Details').item.json.userId }}",
+            "Date Followed": "={{ $('Extract Follower Details').item.json.timestamp }}",
+            "Welcome DM Sent": "Yes",
+            "Welcome DM Date": "={{ $now.toISO() }}",
+            "Follow Up 1 Sent": "No",
+            "Converted": "No"
+          }
+        },
+        "options": {}
+      },
+      "id": "640c9c50-2bd9-486a-a699-d2062e21be25",
+      "name": "Log Follower to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1008,
+        704
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 48
+      },
+      "id": "d36df1cf-affe-43fb-96df-0d1899a2fb58",
+      "name": "Wait 48 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        704
+      ],
+      "webhookId": "67d55c05-87ca-47fc-b6d9-ddc71e53f907"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Followers",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Instagram Username",
+              "lookupValue": "={{ $('Extract Follower Details').item.json.username }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dc4c9f74-fa83-40eb-9c6a-534f982ddf4b",
+      "name": "Check Conversion Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1456,
+        704
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.Converted }}",
+              "rightValue": "No",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4113d800-7dd8-40ed-bed6-98c9fcc0fab3",
+      "name": "Still Not a Customer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $vars.INSTAGRAM_PAGE_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "4585ca16-a7c9-4901-89e9-cd9d0cfc4c7d",
+      "name": "Send 48hr Nudge DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1888,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Followers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Follow Up 1 Sent": "Yes",
+            "Follow Up 1 Date": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "49c6999e-b063-4da8-8403-7e143ba9eccf",
+      "name": "Mark Follow-Up 1 Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1888,
+        784
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\"}",
+        "options": {}
+      },
+      "id": "bf991c81-519b-45b1-83ca-c91f6285d598",
+      "name": "Webhook Response1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        800,
+        816
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8c49470c-b17e-40ad-8085-2ee83cc2f9fc",
+      "name": "Watch for New Confirmed Orders",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 4,
+      "position": [
+        816,
+        816
+      ],
+      "notes": "Polls Orders sheet every minute for rows with Status=Confirmed AND Confirmation Sent=No. Required columns: Order ID, Customer Name, WhatsApp Number, Items Ordered, Total Amount, Status, Delivery Date, Confirmation Sent, Review Requested, Referral Sent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const order = $input.first().json;\n\nconst name = order['Customer Name'] || 'Babe';\nconst items = order['Items Ordered'] || 'your items';\nconst total = order['Total Amount'] || '';\nconst deliveryDate = order['Delivery Date'] || 'as soon as possible';\nconst whatsapp = order['WhatsApp Number'];\nconst orderId = order['Order ID'] || Math.random().toString(36).substr(2,6).toUpperCase();\n\nconst confirmationMsg = `Hi ${name}! 💓 Your order has been confirmed! 🎉\\n\\n*Order Summary:*\\n📦 Items: ${items}\\n💰 Total: ${total ? '₦' + total : 'as discussed'}\\n🚚 Delivery/Pickup: ${deliveryDate}\\n📋 Order Ref: #${orderId}\\n\\nPayment details:\\nBank: [Your Bank Name]\\nAccount: [Your Account Number]\\nName: Tams Beauty Hub\\n\\nPlease send proof of payment and we'll confirm! ✅\\n\\nThank you for shopping with us 💕🌸`;\n\nreturn [{\n  json: {\n    whatsapp,\n    name,\n    items,\n    orderId,\n    deliveryDate,\n    confirmationMsg,\n    rowId: order['Row ID'] || order.rowNumber\n  }\n}];"
+      },
+      "id": "43659b52-f0c1-4d8c-b440-e261543b77f0",
+      "name": "Build Confirmation Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $json.whatsapp }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $json.confirmationMsg }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "531c5921-b9c1-4a91-9f8e-7a49c5ebcc01",
+      "name": "Send Order Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1248,
+        720
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.ORDERS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Confirmation Sent": "Yes",
+            "Confirmation Sent At": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "d75ced77-b1ab-4e96-ade3-868637bdf870",
+      "name": "Mark Confirmation Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1248,
+        944
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "days"
+      },
+      "id": "ba24c1c1-8d82-4c15-8602-ff434d210830",
+      "name": "Wait 2 Days (Post-Delivery)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        816
+      ],
+      "webhookId": "d0173364-17e3-4a33-986a-d170edd88794",
+      "notes": "Waits 2 days after order confirmation before sending satisfaction check-in."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $('Build Confirmation Message').item.json.whatsapp }}"
+            },
+            {
+              "name": "Body",
+              "value": "Hi {{ $('Build Confirmation Message').item.json.name }}! 💕 We hope you're absolutely loving your {{ $('Build Confirmation Message').item.json.items }}! 😍\\n\\nWe'd love to see how you're rocking it — send us a photo and we'll feature you on our page! 📸\\n\\nAlso, a quick review goes a long way for a small business like ours 🙏 Just reply with a few words about your experience 💓\\n\\nThank you for being a Tams Beauty Hub babe! 🌸"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d3a96006-a092-4476-8bce-0c374a8dbe27",
+      "name": "Send Satisfaction Check-In",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1712,
+        720
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.ORDERS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Review Requested": "Yes",
+            "Review Request Date": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a4e1df0f-a8be-42c1-b1ee-89203de192df",
+      "name": "Mark Review Requested",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1712,
+        944
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 7,
+        "unit": "days"
+      },
+      "id": "c6f06206-e0ab-482a-82f0-f1360c04ce0c",
+      "name": "Wait 7 More Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        816
+      ],
+      "webhookId": "e610f210-6872-4401-b14b-50591e09ac2e",
+      "notes": "Waits another 7 days before sending the referral offer."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $('Build Confirmation Message').item.json.whatsapp }}"
+            },
+            {
+              "name": "Body",
+              "value": "Hey {{ $('Build Confirmation Message').item.json.name }}! 🌸 Quick one — do you know anyone who would love Tams Beauty Hub?\\n\\n💰 *Refer a Friend & Earn:*\\nSend your friend to us and when they buy, you both get a special discount:\\n• You get ₦500 off your next order\\n• Your friend gets a first-timer bonus\\n\\nJust tell your friend to mention your name when they message us! That's it 💕\\n\\nThank you for being part of the Tams family! 💓"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d25367fc-86fb-4ed1-8f29-40c0efcc8229",
+      "name": "Send Referral Offer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        720
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.ORDERS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Referral Sent": "Yes",
+            "Referral Sent Date": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "d1ad9204-9956-4552-8ea2-21dd3c7b720a",
+      "name": "Mark Referral Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2160,
+        944
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast List",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Build Confirmation Message').item.json.name }}",
+            "WhatsApp Number": "={{ $('Build Confirmation Message').item.json.whatsapp }}",
+            "Date Added": "={{ $now.toISO() }}",
+            "Source": "Order Confirmation Flow",
+            "VIP": "Yes",
+            "Order Count": "1"
+          }
+        },
+        "options": {}
+      },
+      "id": "003b8f3e-2eea-4181-9095-511dd7bf8aca",
+      "name": "Add to Broadcast List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1488,
+        1040
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Automatically adds every confirmed customer to the VIP broadcast list."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 21 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "76bd8b09-0cd7-4f65-a8d9-96c8cd6e19dc",
+      "name": "Every Sunday 9pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        752
+      ],
+      "notes": "Runs every Sunday at 9pm WAT. Set timezone to Africa/Lagos in n8n settings."
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ACCOUNT_ID }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "followers_count,media_count,biography,website"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $vars.INSTAGRAM_PAGE_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "847d16ec-0053-4349-98a1-7b3d76360313",
+      "name": "Fetch Instagram Followers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1824,
+        544
+      ],
+      "notes": "Gets current Instagram follower count via Meta Graph API."
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ACCOUNT_ID }}/insights",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "metric",
+              "value": "reach,impressions,profile_views,website_clicks"
+            },
+            {
+              "name": "period",
+              "value": "week"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $vars.INSTAGRAM_PAGE_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "95664616-b006-415a-a6d2-09454862a6d9",
+      "name": "Fetch Instagram Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1824,
+        720
+      ],
+      "notes": "Gets weekly reach, impressions, and profile views."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.ORDERS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Orders",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Order Date",
+              "lookupValue": "={{ $now.minus({days: 7}).format('YYYY-MM-DD') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "122cb2db-de2a-4e68-bd3f-866787475dc2",
+      "name": "Fetch This Week's Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        912
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Date",
+              "lookupValue": "={{ $now.minus({days: 7}).format('YYYY-MM-DD') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "20d7b0a7-9ea6-44e1-840a-65107e92a6e9",
+      "name": "Fetch This Week's Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        1072
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast List",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "505d56f9-88ba-4282-a245-226e8b7bf626",
+      "name": "Fetch Broadcast List Count",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        1232
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gather all data\nconst igProfile = $('Fetch Instagram Followers').item.json;\nconst igInsights = $('Fetch Instagram Insights').item.json;\nconst orders = $('Fetch This Week\\'s Orders').all();\nconst leads = $('Fetch This Week\\'s Leads').all();\nconst broadcastList = $('Fetch Broadcast List Count').all();\n\n// Instagram metrics\nconst followers = igProfile.followers_count || 0;\nconst mediaCount = igProfile.media_count || 0;\n\n// Extract insights\nconst insights = igInsights.data || [];\nconst reach = insights.find(i => i.name === 'reach')?.values?.slice(-1)[0]?.value || 0;\nconst impressions = insights.find(i => i.name === 'impressions')?.values?.slice(-1)[0]?.value || 0;\nconst profileViews = insights.find(i => i.name === 'profile_views')?.values?.slice(-1)[0]?.value || 0;\n\n// Orders\nconst totalOrders = orders.length;\nconst totalRevenue = orders.reduce((sum, o) => sum + (parseFloat(o.json['Total Amount']) || 0), 0);\nconst convertedLeads = leads.filter(l => l.json.Converted === 'Yes').length;\nconst newLeads = leads.length;\nconst conversionRate = newLeads > 0 ? Math.round((convertedLeads / newLeads) * 100) : 0;\nconst broadcastCount = broadcastList.length;\n\n// Week dates\nconst weekEnd = new Date().toLocaleDateString('en-NG');\nconst weekStart = new Date(Date.now() - 7*24*60*60*1000).toLocaleDateString('en-NG');\n\nconst report = `📊 TAMS BEAUTY HUB — WEEKLY REPORT\n${weekStart} – ${weekEnd}\n═══════════════════════════════\n\n📸 INSTAGRAM\n• Followers: ${followers.toLocaleString()}\n• Weekly Reach: ${reach.toLocaleString()}\n• Impressions: ${impressions.toLocaleString()}\n• Profile Views: ${profileViews.toLocaleString()}\n• Total Posts: ${mediaCount}\n\n💬 WHATSAPP & LEADS\n• New Leads This Week: ${newLeads}\n• Converted to Sales: ${convertedLeads}\n• Conversion Rate: ${conversionRate}%\n• Broadcast List Size: ${broadcastCount}\n\n🛍️ SALES\n• Orders This Week: ${totalOrders}\n• Est. Revenue: ₦${totalRevenue.toLocaleString()}\n\n═══════════════════════════════\n✅ Keep it up! Tams Beauty Hub is growing 💕`;\n\nreturn [{\n  json: {\n    report,\n    metrics: {\n      followers, reach, impressions, profileViews,\n      newLeads, convertedLeads, conversionRate,\n      totalOrders, totalRevenue, broadcastCount\n    },\n    weekStart, weekEnd\n  }\n}];"
+      },
+      "id": "4492469d-9ac2-48ea-bb25-cc8dd45651be",
+      "name": "Compile Analytics Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2096,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "tamsbeauty17@gmail.com",
+        "subject": "📊 Tams Weekly Report — {{ $json.weekStart }} to {{ $json.weekEnd }}",
+        "message": "HI,Your weekly email report.",
+        "options": {}
+      },
+      "id": "67898f65-7686-45b4-9dad-37f937f8a9e6",
+      "name": "Email Report to Owner",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2304,
+        752
+      ],
+      "webhookId": "271d6174-2762-4894-a383-b2bb61830863",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "MxnkcaGti7H7MAm6",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.ANALYTICS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Weekly Metrics",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Week Ending": "={{ $json.weekEnd }}",
+            "IG Followers": "={{ $json.metrics.followers }}",
+            "IG Reach": "={{ $json.metrics.reach }}",
+            "IG Impressions": "={{ $json.metrics.impressions }}",
+            "Profile Views": "={{ $json.metrics.profileViews }}",
+            "New Leads": "={{ $json.metrics.newLeads }}",
+            "Converted Leads": "={{ $json.metrics.convertedLeads }}",
+            "Conversion Rate %": "={{ $json.metrics.conversionRate }}",
+            "Orders": "={{ $json.metrics.totalOrders }}",
+            "Revenue": "={{ $json.metrics.totalRevenue }}",
+            "Broadcast List Size": "={{ $json.metrics.broadcastCount }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "2167c161-9c7f-4f18-948f-c45f915d934a",
+      "name": "Save Metrics to Analytics Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2304,
+        944
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Builds a running history of weekly metrics for trend analysis. Set ANALYTICS_SHEET_ID in n8n variables."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-customer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6a57bca7-2146-433c-8dc0-370570759a1d",
+      "name": "New Customer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        832,
+        960
+      ],
+      "webhookId": "fc03d6ed-8dd6-4eee-861e-87900c5be591",
+      "notes": "Triggered when a new customer is added — either via Google Sheets update from Workflow 04, or manually called when you add a customer. Can also be triggered from a form or other automation."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\n// Normalise input from different sources\nconst name = body['Customer Name'] || body.name || 'Babe';\nconst whatsapp = body['WhatsApp Number'] || body.whatsapp || body.phone || '';\nconst source = body.source || body.Source || 'Manual';\nconst orderId = body['Order ID'] || body.orderId || '';\nconst items = body['Items Ordered'] || body.items || '';\n\n// Validate phone number (basic check)\nconst cleanPhone = whatsapp.replace(/\\s+/g, '').replace(/^0/, '+234');\nconst isValid = cleanPhone.startsWith('+234') && cleanPhone.length >= 13;\n\nconst firstName = name.split(' ')[0];\n\nreturn [{\n  json: { name, firstName, whatsapp: cleanPhone, isValid, source, orderId, items }\n}];"
+      },
+      "id": "ae028242-c1d7-4382-ab84-f7004f795094",
+      "name": "Parse & Validate Customer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1fa3d892-30f6-4d93-a17f-221e7a8518d0",
+      "name": "Valid Phone Number?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast List",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "WhatsApp Number",
+              "lookupValue": "={{ $json.whatsapp }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f27b51d8-6df3-4601-8674-5ee1ef9c4ba7",
+      "name": "Check If Already on List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1488,
+        864
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $items().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9c6e73c6-feae-4bd8-8a64-7f45f0e19713",
+      "name": "New to Broadcast List?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast List",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Parse & Validate Customer').item.json.name }}",
+            "WhatsApp Number": "={{ $('Parse & Validate Customer').item.json.whatsapp }}",
+            "Date Added": "={{ $now.toISO() }}",
+            "Source": "={{ $('Parse & Validate Customer').item.json.source }}",
+            "VIP": "Yes",
+            "Active": "Yes",
+            "Order Count": "1",
+            "Last Order Date": "={{ $now.format('YYYY-MM-DD') }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "61fb91c2-6adc-40f8-b01b-a9b65f8428f3",
+      "name": "Add to Broadcast List Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1920,
+        784
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $('Parse & Validate Customer').item.json.whatsapp }}"
+            },
+            {
+              "name": "Body",
+              "value": "Hey {{ $('Parse & Validate Customer').item.json.firstName }}! 🎉 You're now officially on our *VIP Broadcast List*! 👑\\n\\nAs a VIP you'll get:\\n✅ Early access to new arrivals\\n✅ Exclusive flash sale prices\\n✅ New nail design previews first\\n✅ Birthday specials 🎂\\n\\nWe'll never spam you — only the good stuff 💕\\n\\nThank you for shopping with *Tams Beauty Hub*! 🌸"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "295a2f57-1cb1-4a4b-95bb-04807a20d998",
+      "name": "Send VIP Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        960
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast List",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order Count": "={{ parseInt($json['Order Count'] || 0) + 1 }}",
+            "Last Order Date": "={{ $now.format('YYYY-MM-DD') }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "430a5796-44f2-4b86-8859-1e79e7e24046",
+      "name": "Update Order Count (Repeat Customer)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1920,
+        1152
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "If customer is already on the list, just update their order count."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "8e1930f3-5a59-4292-9792-abe3d52580f9",
+      "name": "Monday Morning Broadcast Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        1360
+      ],
+      "notes": "Secondary trigger: sends a weekly broadcast to the entire VIP list every Monday at 10am."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.LEADS_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast List",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Active",
+              "lookupValue": "Yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b841993-2ca7-4be7-a7ff-76a2ec9eb1a9",
+      "name": "Fetch All Active Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        1360
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.CONTENT_CALENDAR_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcast Messages",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Scheduled Date",
+              "lookupValue": "={{ $today.format('YYYY-MM-DD') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b384dc9-10f7-46f9-bd7d-bbf4ac7798f3",
+      "name": "Get This Week's Broadcast Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1264,
+        1360
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NS8ZAXMDijhUtsgC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Fetches the weekly broadcast message from the Content Calendar sheet. Add a 'Broadcast Messages' tab with columns: Scheduled Date, Message, Type (promo/arrival/tip)"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "8bf49c26-ca6a-4375-bee0-c31aae5009f6",
+      "name": "Send to Each Subscriber",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1488,
+        1360
+      ],
+      "notes": "Processes one subscriber at a time to avoid rate limiting."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $vars.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:{{ $vars.TWILIO_WHATSAPP_NUMBER }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $json['WhatsApp Number'] }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $('Get This Week\\'s Broadcast Message').item.json.Message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "702a0720-4a1b-4e70-923e-3ecd1b9ea67c",
+      "name": "Send Weekly Broadcast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1712,
+        1360
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "HxsCQmjS8H3tRspI",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "unit": "seconds"
+      },
+      "id": "1b1a3eca-340f-470d-9191-190f537cc960",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        1360
+      ],
+      "webhookId": "1eb49506-78c5-478f-901f-eb9cfb84ec5b",
+      "notes": "1 second delay between messages to stay within Twilio rate limits."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\", \"message\": \"Customer processed\"}",
+        "options": {}
+      },
+      "id": "7222018c-1084-4e57-b8d0-fd0263e783ce",
+      "name": "Webhook Response2",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        1152
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Inbound Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Message & Detect Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Message & Detect Intent": {
+      "main": [
+        [
+          {
+            "node": "Is New Enquiry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Enquiry?": {
+      "main": [
+        [
+          {
+            "node": "Build Welcome Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Lead to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Welcome Message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Wait 24 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 24 Hours": {
+      "main": [
+        [
+          {
+            "node": "Check If Converted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Converted": {
+      "main": [
+        [
+          {
+            "node": "Still Not Converted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Not Converted?": {
+      "main": [
+        [
+          {
+            "node": "Send 24hr Follow-Up",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Follow-Up Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 8am Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Today's Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Today's Content": {
+      "main": [
+        [
+          {
+            "node": "Any Posts Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Posts Today?": {
+      "main": [
+        [
+          {
+            "node": "Split by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email: Nothing Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split by Platform": {
+      "main": [
+        [
+          {
+            "node": "Is Instagram?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is TikTok?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Instagram?": {
+      "main": [
+        [
+          {
+            "node": "Schedule on Buffer (Instagram)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is TikTok?": {
+      "main": [
+        [
+          {
+            "node": "Schedule on Buffer (TikTok)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Status/Broadcast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule on Buffer (Instagram)": {
+      "main": [
+        [
+          {
+            "node": "Mark as Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule on Buffer (TikTok)": {
+      "main": [
+        [
+          {
+            "node": "Mark as Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Status/Broadcast": {
+      "main": [
+        [
+          {
+            "node": "Mark as Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Posted": {
+      "main": [
+        [
+          {
+            "node": "Build Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Daily Summary": {
+      "main": [
+        [
+          {
+            "node": "Email Daily Summary to Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram Follower Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Follower Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Follower Details": {
+      "main": [
+        [
+          {
+            "node": "Check If Already Welcomed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Already Welcomed": {
+      "main": [
+        [
+          {
+            "node": "New Follower?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Follower?": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome DM (Instagram)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Follower to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Follower to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Wait 48 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 48 Hours": {
+      "main": [
+        [
+          {
+            "node": "Check Conversion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conversion Status": {
+      "main": [
+        [
+          {
+            "node": "Still Not a Customer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Not a Customer?": {
+      "main": [
+        [
+          {
+            "node": "Send 48hr Nudge DM",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Follow-Up 1 Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Confirmation Message": {
+      "main": [
+        [
+          {
+            "node": "Send Order Confirmation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Confirmation Sent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add to Broadcast List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Order Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Days (Post-Delivery)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Days (Post-Delivery)": {
+      "main": [
+        [
+          {
+            "node": "Send Satisfaction Check-In",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Review Requested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Satisfaction Check-In": {
+      "main": [
+        [
+          {
+            "node": "Wait 7 More Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 7 More Days": {
+      "main": [
+        [
+          {
+            "node": "Send Referral Offer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark Referral Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Sunday 9pm": {
+      "main": [
+        [
+          {
+            "node": "Fetch Instagram Followers",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Instagram Insights",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch This Week's Orders",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch This Week's Leads",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Broadcast List Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Instagram Followers": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Instagram Insights": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch This Week's Orders": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch This Week's Leads": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Broadcast List Count": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Analytics Report": {
+      "main": [
+        [
+          {
+            "node": "Email Report to Owner",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Metrics to Analytics Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Customer Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Customer": {
+      "main": [
+        [
+          {
+            "node": "Valid Phone Number?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Phone Number?": {
+      "main": [
+        [
+          {
+            "node": "Check If Already on List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Already on List": {
+      "main": [
+        [
+          {
+            "node": "New to Broadcast List?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New to Broadcast List?": {
+      "main": [
+        [
+          {
+            "node": "Add to Broadcast List Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send VIP Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Order Count (Repeat Customer)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Monday Morning Broadcast Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch All Active Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch All Active Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Get This Week's Broadcast Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get This Week's Broadcast Message": {
+      "main": [
+        [
+          {
+            "node": "Send to Each Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Each Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Send Weekly Broadcast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Weekly Broadcast": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Send to Each Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Africa/Lagos",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "8ea2febf-576d-4abf-a19f-ec5e83cfa797",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f3d671d24583963dde91611f6768418a30a9dd7bf4ac5a4254c29712768f33c9"
+  },
+  "nodeGroups": [],
+  "id": "6ZUW1DSD06JmnpRu",
+  "tags": [
+    {
+      "updatedAt": "2026-06-19T15:08:33.794Z",
+      "createdAt": "2026-06-19T15:08:33.794Z",
+      "id": "0Ov0nBU3PskycZOr",
+      "name": "TAMS Beauty Hub"
+    }
+  ]
+}
