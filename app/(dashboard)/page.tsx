@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { auth } from "@/auth";
-import Link from "next/link";
 import { getUpcomingAppointments } from "@/lib/actions/appointments";
 import { Badge } from "@/components/ui/badge";
 import {

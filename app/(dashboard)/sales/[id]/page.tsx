@@ -42,9 +42,11 @@ export default async function SaleDetailPage({
             amountPaid={order.amountPaid}
             paymentMethod={order.paymentMethod as "cash" | "transfer" | "pos"}
           />
-          <Button asChild variant="outline" size="sm">
-            <Link href="/sales">Back to sales</Link>
-          </Button>
+          <Link href="/sales">
+            <Button variant="outline" size="sm">
+              Back to sales
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -55,12 +57,12 @@ export default async function SaleDetailPage({
           </CardHeader>
           <CardContent>
             <ReceiptView receipt={receipt} />
-            <Button asChild className="mt-6 w-full">
-              <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer">
+            <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer">
+              <Button className="mt-6 w-full">
                 <Share2 className="h-4 w-4" />
                 Share via WhatsApp
-              </a>
-            </Button>
+              </Button>
+            </a>
           </CardContent>
         </Card>
 

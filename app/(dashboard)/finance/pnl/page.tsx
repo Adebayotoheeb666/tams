@@ -1,7 +1,8 @@
 "use server";
 
 import Link from "next/link";
-import { computePnL, exportStatement } from "@/lib/actions/finance";
+import { computePnL } from "@/lib/actions/finance";
+import { exportPnlExcel, exportPnlPdf } from "../finance-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNaira } from "@/lib/utils";
@@ -17,24 +18,6 @@ export default async function PnlPage({ searchParams }: { searchParams: SearchPa
   const { from, to, compareFrom, compareTo } = searchParams;
   const statement = await computePnL({ from, to, compareFrom, compareTo });
 
-  async function exportPdf() {
-    await exportStatement({
-      type: "pdf",
-      from: from ?? undefined,
-      to: to ?? undefined,
-      statement: "pnl",
-    });
-  }
-
-  async function exportExcel() {
-    await exportStatement({
-      type: "excel",
-      from: from ?? undefined,
-      to: to ?? undefined,
-      statement: "pnl",
-    });
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -43,10 +26,14 @@ export default async function PnlPage({ searchParams }: { searchParams: SearchPa
           <p className="text-muted-foreground">Revenue, costs, and expenses for the selected period.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <form action={exportPdf}>
+          <form action={exportPnlPdf}>
+            <input type="hidden" name="from" value={from ?? ""} />
+            <input type="hidden" name="to" value={to ?? ""} />
             <Button type="submit">Export PDF</Button>
           </form>
-          <form action={exportExcel}>
+          <form action={exportPnlExcel}>
+            <input type="hidden" name="from" value={from ?? ""} />
+            <input type="hidden" name="to" value={to ?? ""} />
             <Button type="submit" variant="outline">Export Excel</Button>
           </form>
         </div>

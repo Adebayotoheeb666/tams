@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getBroadcasts, getCampaigns, getKpis, getLeads, getReferrals, getTestimonials, syncSocialAnalyticsMetrics, updateKpi } from "@/lib/actions/marketing";
 import { getMarketingHealthScore } from "@/lib/utils/marketing";
-import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function createKpiAction(formData: FormData) {
   "use server";

@@ -1,7 +1,8 @@
 "use server";
 
 import Link from "next/link";
-import { computePnL, exportStatement } from "@/lib/actions/finance";
+import { computePnL } from "@/lib/actions/finance";
+import { exportExpensesExcel, exportExpensesPdf } from "../finance-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNaira } from "@/lib/utils";
@@ -15,24 +16,6 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
   const { from, to } = searchParams;
   const statement = await computePnL({ from, to });
 
-  async function exportPdf() {
-    await exportStatement({
-      type: "pdf",
-      from: from ?? undefined,
-      to: to ?? undefined,
-      statement: "expenses",
-    });
-  }
-
-  async function exportExcel() {
-    await exportStatement({
-      type: "excel",
-      from: from ?? undefined,
-      to: to ?? undefined,
-      statement: "expenses",
-    });
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -41,10 +24,14 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
           <p className="text-muted-foreground">Breakdown of expense account balances for the chosen period.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <form action={exportPdf}>
+          <form action={exportExpensesPdf}>
+            <input type="hidden" name="from" value={from ?? ""} />
+            <input type="hidden" name="to" value={to ?? ""} />
             <Button type="submit">Export PDF</Button>
           </form>
-          <form action={exportExcel}>
+          <form action={exportExpensesExcel}>
+            <input type="hidden" name="from" value={from ?? ""} />
+            <input type="hidden" name="to" value={to ?? ""} />
             <Button type="submit" variant="outline">Export Excel</Button>
           </form>
         </div>

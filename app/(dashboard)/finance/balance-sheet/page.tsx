@@ -1,7 +1,8 @@
 "use server";
 
 import Link from "next/link";
-import { computeBalanceSheet, exportStatement } from "@/lib/actions/finance";
+import { computeBalanceSheet } from "@/lib/actions/finance";
+import { exportBalanceSheetExcel, exportBalanceSheetPdf } from "../finance-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNaira } from "@/lib/utils";
@@ -14,24 +15,6 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
   const { date } = searchParams;
   const report = await computeBalanceSheet({ date });
 
-  async function exportPdf() {
-    await exportStatement({
-      type: "pdf",
-      from: date ?? undefined,
-      to: date ?? undefined,
-      statement: "balance-sheet",
-    });
-  }
-
-  async function exportExcel() {
-    await exportStatement({
-      type: "excel",
-      from: date ?? undefined,
-      to: date ?? undefined,
-      statement: "balance-sheet",
-    });
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -40,10 +23,12 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
           <p className="text-muted-foreground">Assets, liabilities, and equity on the selected date.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <form action={exportPdf}>
+          <form action={exportBalanceSheetPdf}>
+            <input type="hidden" name="date" value={date ?? ""} />
             <Button type="submit">Export PDF</Button>
           </form>
-          <form action={exportExcel}>
+          <form action={exportBalanceSheetExcel}>
+            <input type="hidden" name="date" value={date ?? ""} />
             <Button type="submit" variant="outline">Export Excel</Button>
           </form>
         </div>

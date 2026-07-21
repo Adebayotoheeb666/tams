@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 
-import type { ReactNode } from "react";
-
 interface MarketingPageShellProps {
   title: string;
   description: string;

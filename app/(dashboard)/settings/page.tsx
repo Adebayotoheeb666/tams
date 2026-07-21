@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getUsers } from "@/lib/actions/settings";
-import { getSocialPosts } from "@/lib/actions/social-media";
+import { getSocialPosts, scheduleSocialPost } from "@/lib/actions/social-media";
 import { getAutomationSettings } from "@/lib/actions/automation";
 import { UserManager } from "@/components/settings/user-manager";
 import { SocialMediaManager } from "@/components/settings/social-media-manager";
@@ -54,7 +54,7 @@ export default async function SettingsPage() {
 
       <AutomationManager initialSettings={automationSettings} />
 
-      <SocialMediaManager initialPosts={socialPosts} />
+      <SocialMediaManager initialPosts={socialPosts} scheduleAction={scheduleSocialPost} />
 
       <UserManager users={users} />
     </div>

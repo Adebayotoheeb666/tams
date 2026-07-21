@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { LoadingSubmitButton } from "@/components/ui/loading-submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { createContentPost, getContentCalendar, syncContentToBuffer, getBufferStats } from "@/lib/actions/marketing";
-import { MarketingPageShell } from "@/components/marketing/marketing-page-shell";
 
 async function createContentAction(formData: FormData) {
   "use server";

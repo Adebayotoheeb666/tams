@@ -1,6 +1,5 @@
 "use client";
 
-import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 import { useFormStatus } from "react-dom";
@@ -60,11 +59,32 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const { pending } = useFormStatus();
     const isSubmitting = !asChild && (type === "submit" || type === undefined) && pending;
     const isLoading = loading || isSubmitting;
-    const Comp = asChild ? Slot : "button";
+    const buttonClassName = cn(buttonVariants({ variant, size, className }));
+
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children, {
+        className: cn(buttonClassName, (children.props as any)?.className),
+        ref,
+        disabled: isLoading || disabled || (children.props as any)?.disabled,
+        "aria-busy": isLoading || undefined,
+        ...props,
+        children: (
+          <>
+            {isLoading ? (
+              <span
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+              />
+            ) : null}
+            {children.props?.children ?? children}
+          </>
+        ),
+      });
+    }
 
     return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+      <button
+        className={buttonClassName}
         ref={ref}
         type={type}
         disabled={isLoading || disabled}
@@ -78,7 +98,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           />
         ) : null}
         {children}
-      </Comp>
+      </button>
     );
   },
 );

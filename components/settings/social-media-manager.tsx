@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { scheduleSocialPost } from "@/lib/actions/social-media";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,14 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { SocialPost } from "@/lib/db/schema";
 
-export function SocialMediaManager({ initialPosts }: { initialPosts: SocialPost[] }) {
+export function SocialMediaManager({
+  initialPosts,
+  scheduleAction,
+}: {
+  initialPosts: SocialPost[];
+  scheduleAction: (formData: FormData) => Promise<void>;
+}) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Social media automation</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <form action={scheduleSocialPost} className="grid gap-4 md:grid-cols-2">
+        <form action={scheduleAction} className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="platform">Platform</Label>
             <select

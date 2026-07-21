@@ -34,9 +34,9 @@ export default async function SalesHistoryPage({
             {total} sale{total === 1 ? "" : "s"} recorded
           </p>
         </div>
-        <Button asChild>
-          <Link href="/sales/new">New sale</Link>
-        </Button>
+        <Link href="/sales/new">
+          <Button>New sale</Button>
+        </Link>
       </div>
 
       <form className="flex flex-wrap gap-3" method="get">
@@ -56,9 +56,9 @@ export default async function SalesHistoryPage({
           Filter
         </Button>
         {(searchParams.from || searchParams.to) && (
-          <Button asChild variant="outline">
-            <Link href="/sales">Clear</Link>
-          </Button>
+          <Link href="/sales">
+            <Button variant="outline">Clear</Button>
+          </Link>
         )}
       </form>
 
@@ -102,41 +102,31 @@ export default async function SalesHistoryPage({
 
       {totalPages > 1 ? (
         <div className="flex items-center justify-center gap-3">
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
+          <Link
+            href={`/sales?${new URLSearchParams({
+              ...(searchParams.from ? { from: searchParams.from } : {}),
+              ...(searchParams.to ? { to: searchParams.to } : {}),
+              page: String(page - 1),
+            }).toString()}`}
           >
-            <Link
-              href={`/sales?${new URLSearchParams({
-                ...(searchParams.from ? { from: searchParams.from } : {}),
-                ...(searchParams.to ? { to: searchParams.to } : {}),
-                page: String(page - 1),
-              }).toString()}`}
-            >
+            <Button variant="outline" size="sm" disabled={page <= 1}>
               Previous
-            </Link>
-          </Button>
+            </Button>
+          </Link>
           <span className="text-sm text-muted-foreground">
             Page {page} of {totalPages}
           </span>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
+          <Link
+            href={`/sales?${new URLSearchParams({
+              ...(searchParams.from ? { from: searchParams.from } : {}),
+              ...(searchParams.to ? { to: searchParams.to } : {}),
+              page: String(page + 1),
+            }).toString()}`}
           >
-            <Link
-              href={`/sales?${new URLSearchParams({
-                ...(searchParams.from ? { from: searchParams.from } : {}),
-                ...(searchParams.to ? { to: searchParams.to } : {}),
-                page: String(page + 1),
-              }).toString()}`}
-            >
+            <Button variant="outline" size="sm" disabled={page >= totalPages}>
               Next
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       ) : null}
     </div>
