@@ -215,7 +215,7 @@ export function ProductForm({ categories, product, mode }: ProductFormProps) {
       ) : null}
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending} loading={isPending}>
           {isPending
             ? "Saving…"
             : mode === "create"

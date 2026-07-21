@@ -9,10 +9,7 @@ export function LoadingSubmitButton({ children, ...props }: ComponentProps<typeo
 
   return (
     <Button {...props} disabled={pending || props.disabled}>
-      <span className="inline-flex items-center gap-2">
-        {pending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : null}
-        {pending ? "Working..." : children}
-      </span>
+      {pending ? "Working..." : children}
     </Button>
   );
 }

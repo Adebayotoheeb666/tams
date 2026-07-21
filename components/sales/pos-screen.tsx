@@ -403,6 +403,7 @@ export function PosScreen({ products: initialProducts }: { products: PosProduct[
                 className="w-full"
                 size="lg"
                 disabled={isPending || cart.length === 0}
+                loading={isPending}
                 onClick={handleConfirmSale}
               >
                 {isPending ? "Processing…" : "Confirm sale"}

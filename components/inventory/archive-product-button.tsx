@@ -39,6 +39,7 @@ export function ArchiveProductButton({ productId }: { productId: string }) {
         size="sm"
         onClick={handleArchive}
         disabled={isPending}
+        loading={isPending}
       >
         {isPending ? "Archiving…" : "Archive product"}
       </Button>

@@ -124,6 +124,7 @@ export function AppointmentList({
                             size="sm"
                             variant={status === "cancelled" || status === "no_show" ? "outline" : "default"}
                             disabled={isPending}
+                            loading={isPending}
                             onClick={() =>
                               handleStatusChange(appointment.id, status)
                             }
