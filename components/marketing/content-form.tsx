@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createContentPost } from "@/lib/actions/marketing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 export function ContentForm() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -42,18 +44,33 @@ export function ContentForm() {
         }
       }
 
-      const result = await createContentPost({
-        campaignId: formData.get("campaignId")?.toString() || undefined,
+      const payload: Record<string, unknown> = {
         platform: formData.get("platform")?.toString() || "instagram",
         contentType: formData.get("contentType")?.toString() || "product_showcase",
         title: formData.get("title")?.toString() || "New content",
-        caption: formData.get("caption")?.toString() || undefined,
-        contentUrl,
-        scheduledDate: formData.get("scheduledDate")?.toString() || undefined,
-        hashtags: formData.getAll("hashtags").map(String),
-        targetAudience: formData.get("targetAudience")?.toString() || undefined,
-        callToAction: formData.get("callToAction")?.toString() || undefined,
-      });
+      };
+
+      const campaignId = formData.get("campaignId")?.toString();
+      if (campaignId) payload.campaignId = campaignId;
+
+      const caption = formData.get("caption")?.toString();
+      if (caption) payload.caption = caption;
+
+      if (contentUrl) payload.contentUrl = contentUrl;
+
+      const scheduledDate = formData.get("scheduledDate")?.toString();
+      if (scheduledDate) payload.scheduledDate = scheduledDate;
+
+      const hashtags = formData.getAll("hashtags").map(String).filter(Boolean);
+      if (hashtags.length > 0) payload.hashtags = hashtags;
+
+      const targetAudience = formData.get("targetAudience")?.toString();
+      if (targetAudience) payload.targetAudience = targetAudience;
+
+      const callToAction = formData.get("callToAction")?.toString();
+      if (callToAction) payload.callToAction = callToAction;
+
+      const result = await createContentPost(payload);
 
       if (!result.success) {
         toast.error(result.error || "Failed to create post");
@@ -63,6 +80,7 @@ export function ContentForm() {
       toast.success("Post created successfully");
       e.currentTarget.reset();
       setFile(null);
+      router.refresh();
     } catch (error) {
       toast.error("An error occurred while creating the post");
       console.error(error);

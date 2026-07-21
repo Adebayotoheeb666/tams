@@ -4,6 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { advanceCustomerStage, getJourneyMetrics, recordTouchpoint } from "@/lib/actions/marketing";
 import { CustomerJourneyChart } from "@/components/marketing/customer-journey-chart";
+import { db } from "@/lib/db";
+import { asc } from "drizzle-orm";
+import { customers } from "@/lib/db/schema";
 
 async function updateJourneyAction(formData: FormData) {
   "use server";
@@ -21,8 +24,18 @@ async function recordTouchpointAction(formData: FormData) {
   );
 }
 
+async function getCustomerOptions() {
+  return db.query.customers.findMany({
+    orderBy: [asc(customers.name)],
+    limit: 100,
+  });
+}
+
 export default async function CustomerJourneyPage() {
-  const metricsResult = await getJourneyMetrics();
+  const [metricsResult, customerOptions] = await Promise.all([
+    getJourneyMetrics(),
+    getCustomerOptions(),
+  ]);
   const metrics = metricsResult.success ? metricsResult.data : null;
 
   const stageColors: Record<string, string> = {
@@ -116,8 +129,24 @@ export default async function CustomerJourneyPage() {
                 <label className="text-sm font-medium" htmlFor="customerId">
                   Customer ID
                 </label>
-                <Input id="customerId" name="customerId" placeholder="customer-id" required />
+                <Input
+                  id="customerId"
+                  name="customerId"
+                  placeholder="Type or select customer ID"
+                  list="customer-id-list"
+                  required
+                />
               </div>
+              <datalist id="customer-id-list">
+                {customerOptions.map((customer) => (
+                  <option
+                    key={customer.id}
+                    value={customer.id}
+                  >
+                    {customer.name} — {customer.id}
+                  </option>
+                ))}
+              </datalist>
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="stage">
                   New stage
@@ -149,7 +178,13 @@ export default async function CustomerJourneyPage() {
                 <label className="text-sm font-medium" htmlFor="touchpointCustomerId">
                   Customer ID
                 </label>
-                <Input id="touchpointCustomerId" name="customerId" placeholder="customer-id" required />
+                <Input
+                  id="touchpointCustomerId"
+                  name="customerId"
+                  placeholder="Type or select customer ID"
+                  list="customer-id-list"
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="touchpointType">

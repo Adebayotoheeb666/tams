@@ -130,18 +130,27 @@ export async function createContentPost(input: unknown) {
 
     const status = validated.scheduledDate ? "scheduled" : "draft";
 
+    const campaignId = validated.campaignId?.trim()
+      ? validated.campaignId.trim()
+      : null;
+    const hashtags = validated.hashtags && validated.hashtags.length > 0
+      ? JSON.stringify(validated.hashtags)
+      : null;
+    const contentUrl = validated.contentUrl?.trim() || null;
+    const scheduledDate = validated.scheduledDate?.trim() || null;
+
     await db.insert(contentCalendar).values({
       id,
-      campaignId: validated.campaignId || null,
+      campaignId,
       platform: validated.platform,
       contentType: validated.contentType,
       title: validated.title,
       caption: validated.caption || null,
-      contentUrl: validated.contentUrl || null,
-      scheduledDate: validated.scheduledDate || null,
+      contentUrl,
+      scheduledDate,
       postedDate: null,
       status,
-      hashtags: validated.hashtags ? JSON.stringify(validated.hashtags) : null,
+      hashtags,
       targetAudience: validated.targetAudience || null,
       expectedReach: 0,
       actualReach: 0,
