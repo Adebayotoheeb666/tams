@@ -126,7 +126,7 @@ export function AppointmentForm({ services }: { services: Service[] }) {
       ) : null}
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending} loading={isPending}>
           {isPending ? "Booking…" : "Book appointment"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>

@@ -115,6 +115,7 @@ export function AutomationManager({ initialSettings }: AutomationManagerProps) {
                         size="sm"
                         onClick={() => handleToggle(setting.key)}
                         disabled={isPending}
+                        loading={isPending}
                       >
                         {setting.value === "1" ? "Enabled" : "Disabled"}
                       </Button>

@@ -112,7 +112,7 @@ export function CsvImportForm() {
               </p>
             ) : null}
 
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} loading={isPending}>
               <Upload className="h-4 w-4" />
               {isPending ? "Importing…" : "Import products"}
             </Button>

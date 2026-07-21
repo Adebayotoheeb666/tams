@@ -31,6 +31,7 @@ export function BulkReceivePanel({ orders, bulkReceive }: Props) {
         <Button
           type="button"
           disabled={selected.length === 0 || isPending}
+          loading={isPending}
           onClick={() => {
             startTransition(async () => {
               await bulkReceive({ ids: selected });

@@ -63,7 +63,7 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
             {error}
           </p>
         ) : null}
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending} loading={isPending}>
           {isPending ? "Adding…" : "Add category"}
         </Button>
       </form>

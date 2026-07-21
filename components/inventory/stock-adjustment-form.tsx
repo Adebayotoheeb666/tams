@@ -136,7 +136,7 @@ export function StockAdjustmentForm({
         </p>
       ) : null}
 
-      <Button type="submit" disabled={isPending}>
+      <Button type="submit" disabled={isPending} loading={isPending}>
         {isPending ? "Adjusting…" : "Apply adjustment"}
       </Button>
     </form>

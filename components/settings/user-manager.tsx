@@ -85,7 +85,7 @@ export function UserManager({ users }: { users: User[] }) {
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} loading={isPending}>
               {isPending ? "Adding…" : "Add user"}
             </Button>
           </form>
@@ -118,6 +118,7 @@ export function UserManager({ users }: { users: User[] }) {
                   size="sm"
                   variant="outline"
                   disabled={isPending}
+                  loading={isPending}
                   onClick={() => handleToggle(user.id)}
                 >
                   {user.isActive ? "Deactivate" : "Reactivate"}

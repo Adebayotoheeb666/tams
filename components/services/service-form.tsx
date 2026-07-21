@@ -155,7 +155,7 @@ const price = Math.round(nairaToKobo(parseFloat(String(priceNaira || "0"))));
         </div>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading} loading={isLoading}>
             {mode === "create" ? "Create service" : "Save changes"}
           </Button>
 
@@ -164,6 +164,7 @@ const price = Math.round(nairaToKobo(parseFloat(String(priceNaira || "0"))));
               type="button"
               variant="outline"
               disabled={isLoading}
+              loading={isLoading}
               onClick={handleToggleActive}>
               {service.isActive ? "Deactivate" : "Activate"}
             </Button>

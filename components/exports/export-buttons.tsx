@@ -41,10 +41,10 @@ export function ExportButtons() {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-3">
-        <Button onClick={handleExportPdf} disabled={isPending}>
+        <Button onClick={handleExportPdf} disabled={isPending} loading={isPending}>
           {isPending ? "Exporting..." : "Export PDF"}
         </Button>
-        <Button onClick={handleExportExcel} variant="outline" disabled={isPending}>
+        <Button onClick={handleExportExcel} variant="outline" disabled={isPending} loading={isPending}>
           {isPending ? "Exporting..." : "Export Excel"}
         </Button>
       </div>

@@ -77,7 +77,7 @@ export function SupplierForm({ supplier, mode }: Props) {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={isPending}>{isPending ? "Saving…" : mode === "create" ? "Create supplier" : "Save changes"}</Button>
+        <Button type="submit" disabled={isPending} loading={isPending}>{isPending ? "Saving…" : mode === "create" ? "Create supplier" : "Save changes"}</Button>
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>Cancel</Button>
       </div>
     </form>
