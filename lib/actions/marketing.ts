@@ -123,8 +123,7 @@ export async function createContentPost(input: unknown) {
       return { error: "Unauthorized", success: false };
     }
 
-    const normalizedInput = await normalizeContentPostInput(input as any);
-    const validated = createContentPostSchema.parse(normalizedInput);
+    const validated = createContentPostSchema.parse(input);
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -133,9 +132,22 @@ export async function createContentPost(input: unknown) {
 
     await db.insert(contentCalendar).values({
       id,
-      ...validated,
+      campaignId: validated.campaignId || null,
+      platform: validated.platform,
+      contentType: validated.contentType,
+      title: validated.title,
+      caption: validated.caption || null,
+      contentUrl: validated.contentUrl || null,
+      scheduledDate: validated.scheduledDate || null,
+      postedDate: null,
       status,
       hashtags: validated.hashtags ? JSON.stringify(validated.hashtags) : null,
+      targetAudience: validated.targetAudience || null,
+      expectedReach: 0,
+      actualReach: 0,
+      engagementRate: 0,
+      callToAction: validated.callToAction || null,
+      bufferPostId: null,
       createdBy: session.user.id,
       createdAt: now,
       updatedAt: now,
@@ -164,8 +176,12 @@ export async function createContentPost(input: unknown) {
 
     return { success: true, data: { id } };
   } catch (error) {
+    console.error("Error creating content post:", error);
     if (error instanceof ZodError) {
       return { error: error.issues[0]?.message || "Validation failed", success: false };
+    }
+    if (error instanceof Error) {
+      return { error: error.message, success: false };
     }
     return { error: "Failed to create content post", success: false };
   }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { getCategories, getProductById } from "@/lib/actions/inventory";
@@ -55,6 +56,21 @@ export default async function ProductDetailPage({
           <Link href="/inventory">Back to inventory</Link>
         </Button>
       </div>
+
+      {product.imageUrl ? (
+        <Card>
+          <CardContent className="p-4">
+            <div className="relative h-64 w-full overflow-hidden rounded-lg bg-muted">
+              <Image
+                src={product.imageUrl}
+                alt={product.name}
+                fill
+                className="object-cover"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
