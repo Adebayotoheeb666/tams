@@ -264,7 +264,7 @@ export async function publishSocialPost(post: ScheduledSocialPost) {
       "profile_ids[]": profileId,
       text: `${post.caption}${post.hashtags ? ` ${post.hashtags}` : ""}`,
       ...(post.imageUrl ? { "media[photo]": post.imageUrl } : {}),
-      scheduled_at: post.scheduledAt,
+      scheduled_at: Math.floor(new Date(post.scheduledAt).getTime() / 1000).toString(),
     }).toString(),
   });
 
