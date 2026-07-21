@@ -2,6 +2,7 @@ import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { LoadingSubmitButton } from "@/components/ui/loading-submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { createContentPost, getContentCalendar, syncContentToBuffer, getBufferStats } from "@/lib/actions/marketing";
 
@@ -14,7 +15,8 @@ async function createContentAction(formData: FormData) {
     contentType: formData.get("contentType") || "product_showcase",
     title: formData.get("title") || "New content",
     caption: formData.get("caption") || undefined,
-    contentUrl: formData.get("contentUrl") || undefined,
+    contentUrl: formData.get("contentUrl")?.toString() || undefined,
+    contentFile: formData.get("contentFile") instanceof File ? formData.get("contentFile") : undefined,
     scheduledDate: formData.get("scheduledDate") || undefined,
     hashtags: formData.getAll("hashtags").map(String),
     targetAudience: formData.get("targetAudience") || undefined,
@@ -91,8 +93,14 @@ export default async function ContentCalendarPage() {
               <Input id="scheduledDate" name="scheduledDate" type="date" />
             </div>
             <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="contentFile">
+                Upload content
+              </label>
+              <Input id="contentFile" name="contentFile" type="file" accept="image/*,video/*" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium" htmlFor="contentUrl">
-                Content URL
+                Reference URL (optional)
               </label>
               <Input id="contentUrl" name="contentUrl" type="url" placeholder="https://..." />
             </div>
@@ -108,7 +116,7 @@ export default async function ContentCalendarPage() {
               </label>
               <Input id="callToAction" name="callToAction" placeholder="Book your appointment today" />
             </div>
-            <Button type="submit">Save post</Button>
+            <LoadingSubmitButton type="submit">Save post</LoadingSubmitButton>
           </form>
         </CardContent>
       </Card>
@@ -158,9 +166,9 @@ export default async function ContentCalendarPage() {
               ) : (
                 <form action={syncContentBufferAction} className="mt-3">
                   <input type="hidden" name="contentId" value={post.id} />
-                  <Button type="submit" variant="outline" size="sm" className="w-full">
+                  <LoadingSubmitButton type="submit" variant="outline" size="sm" className="w-full">
                     Sync to Buffer
-                  </Button>
+                  </LoadingSubmitButton>
                 </form>
               )}
             </CardContent>

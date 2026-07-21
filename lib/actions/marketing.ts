@@ -37,6 +37,7 @@ import {
   calculateBroadcastPerformance,
   calculateLeadScore as calculateLeadScoreFromInput,
 } from "@/lib/utils/marketing";
+import { normalizeContentPostInput } from "@/lib/utils/marketing/content-calendar";
 import { buildSocialAnalyticsKpiRows } from "@/lib/utils/marketing/social-analytics";
 import { generateReferralCode as generateCode } from "@/lib/utils/referral";
 
@@ -122,7 +123,8 @@ export async function createContentPost(input: unknown) {
       return { error: "Unauthorized", success: false };
     }
 
-    const validated = createContentPostSchema.parse(input);
+    const normalizedInput = await normalizeContentPostInput(input as any);
+    const validated = createContentPostSchema.parse(normalizedInput);
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
