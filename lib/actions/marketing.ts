@@ -142,13 +142,21 @@ export async function createContentPost(input: unknown) {
     });
 
     if (validated.scheduledDate) {
-      await scheduleSocialPost({
-        platform: validated.platform,
-        caption: validated.caption || validated.title,
-        imageUrl: validated.contentUrl,
-        hashtags: validated.hashtags?.join(" "),
-        scheduledAt: validated.scheduledDate,
-      });
+      const socialPostId = await scheduleSocialPost(
+        {
+          platform: validated.platform,
+          caption: validated.caption || validated.title,
+          imageUrl: validated.contentUrl,
+          hashtags: validated.hashtags?.join(" "),
+          scheduledAt: new Date(validated.scheduledDate).toISOString(),
+        },
+        { returnId: true },
+      );
+
+      await db
+        .update(contentCalendar)
+        .set({ bufferPostId: socialPostId, updatedAt: new Date().toISOString() })
+        .where(eq(contentCalendar.id, id));
     }
 
     revalidatePath("/marketing/content-calendar");
