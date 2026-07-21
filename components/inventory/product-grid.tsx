@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,16 @@ export function ProductGrid({ products }: { products: ProductWithCategory[] }) {
           <Link key={product.id} href={`/inventory/${product.id}`}>
             <Card className="h-full transition-colors hover:border-primary/40">
               <CardContent className="space-y-3 p-4">
+                {product.imageUrl ? (
+                  <div className="relative h-40 w-full overflow-hidden rounded-lg bg-muted">
+                    <Image
+                      src={product.imageUrl}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : null}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h3 className="truncate font-medium">{product.name}</h3>

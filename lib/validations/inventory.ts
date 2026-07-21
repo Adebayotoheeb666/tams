@@ -18,7 +18,8 @@ export const createProductSchema = z.object({
   imageUrl: z
     .union([z.string().url(), z.literal("")])
     .optional()
-    .transform((v) => (v ? v : undefined)),
+    .nullable()
+    .transform((v) => v || null),
 });
 
 export const updateProductSchema = createProductSchema
