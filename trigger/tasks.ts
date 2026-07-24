@@ -12,26 +12,26 @@ import { socialPostPublisherJob } from "./jobs/social-post-publisher";
 
 // Event-driven tasks
 export const socialPostPublisherTask = task({
-  id: "social-post-publisher",
+  id: "social.posts.publish",
   run: async (payload: { postId?: string }) => socialPostPublisherJob(payload),
 });
 
 export const lowStockAlertTask = task({
-  id: "inventory-alerts-low-stock",
+  id: "inventory.alerts.low-stock",
   run: async (payload: { productId?: string; productName?: string; currentQuantity?: number; reorderLevel?: number }) => {
     return lowStockAlertJob();
   },
 });
 
 export const appointmentReminderTask = task({
-  id: "appointments-reminders-send",
+  id: "appointments.reminders.send",
   run: async (payload: { appointmentId?: string }) => {
     return appointmentRemindersJob();
   },
 });
 
 export const appointmentConfirmedTask = task({
-  id: "appointments-confirmations-send",
+  id: "appointments.confirmations.send",
   run: async (payload: { appointmentId?: string }) => {
     if (!payload.appointmentId) {
       return { ok: true, message: "No appointment ID supplied" };
@@ -42,7 +42,7 @@ export const appointmentConfirmedTask = task({
 });
 
 export const exportStatementTask = task({
-  id: "exports-statements-generate",
+  id: "exports.statements.generate",
   run: async (payload: { jobId?: string }) => {
     if (!payload.jobId) {
       throw new Error("A jobId is required");
@@ -54,7 +54,7 @@ export const exportStatementTask = task({
 
 // Scheduled / recurring tasks
 export const leadFollowUpTask = schedules.task({
-  id: "lead-follow-up",
+  id: "leads.followups.send",
   cron: {
     pattern: "0 9 * * *",
     timezone: "Africa/Lagos",
@@ -63,7 +63,7 @@ export const leadFollowUpTask = schedules.task({
 });
 
 export const dailySummaryTask = schedules.task({
-  id: "daily-summary",
+  id: "summaries.daily.generate",
   cron: {
     pattern: "0 18 * * *",
     timezone: "Africa/Lagos",
@@ -72,7 +72,7 @@ export const dailySummaryTask = schedules.task({
 });
 
 export const monthlyStatementsTask = schedules.task({
-  id: "monthly-statements",
+  id: "statements.monthly.generate",
   cron: {
     pattern: "0 0 1 * *",
     timezone: "Africa/Lagos",
@@ -81,7 +81,7 @@ export const monthlyStatementsTask = schedules.task({
 });
 
 export const customerJourneySyncTask = schedules.task({
-  id: "customer-journey-sync",
+  id: "customers.journeys.sync",
   cron: {
     pattern: "0 0 * * *",
     timezone: "Africa/Lagos",

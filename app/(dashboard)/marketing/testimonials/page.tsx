@@ -4,15 +4,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { getTestimonials, submitTestimonialWithSentiment, getTestimonialsBySentiment, approveTestimonial, repostTestimonialToSocial } from "@/lib/actions/marketing";
+import { getTestimonials, submitTestimonialWithSentiment, getTestimonialsBySentiment, approveTestimonial, repostTestimonialToSocial, getCustomers, getProducts } from "@/lib/actions/marketing";
 import { TestimonialSentimentChart } from "@/components/marketing/testimonial-sentiment-chart";
 
 async function createTestimonialAction(formData: FormData) {
   "use server";
 
+  const selectedCustomerId = formData.get("customerIdSelect")?.toString();
+  const manualCustomerId = formData.get("customerId")?.toString();
+  const selectedProductId = formData.get("productIdSelect")?.toString();
+  const manualProductId = formData.get("productId")?.toString();
+
   await submitTestimonialWithSentiment(
-    formData.get("customerId")?.toString() || "",
-    formData.get("productId")?.toString() || "",
+    selectedCustomerId?.trim() || manualCustomerId?.trim() || "",
+    selectedProductId?.trim() || manualProductId?.trim() || undefined,
     Number(formData.get("rating") || 5),
     formData.get("textReview")?.toString() || "",
     formData.get("platformShared")?.toString() || "in_person",
@@ -46,13 +51,17 @@ const COLORS = {
 };
 
 export default async function TestimonialsPage() {
-  const [allResult, pendingResult] = await Promise.all([
+  const [allResult, pendingResult, customersResult, productsResult] = await Promise.all([
     getTestimonials(),
     getTestimonials("pending_approval"),
+    getCustomers(),
+    getProducts(),
   ]);
 
   const testimonials = allResult.success ? allResult.data : [];
   const pendingTestimonials = pendingResult.success ? pendingResult.data : [];
+  const customerOptions = customersResult.success ? customersResult.data : [];
+  const productOptions = productsResult.success ? productsResult.data : [];
   const sentimentResult = await getTestimonialsBySentiment();
   const sentimentData = sentimentResult.success ? sentimentResult.data : null;
 
@@ -141,15 +150,41 @@ export default async function TestimonialsPage() {
           <CardContent>
             <form action={createTestimonialAction} className="grid gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="customerId">
-                  Customer ID
+                <label className="text-sm font-medium" htmlFor="customerIdSelect">
+                  Customer
                 </label>
-                <Input id="customerId" name="customerId" placeholder="customer-id" required />
+                <select
+                  id="customerIdSelect"
+                  name="customerIdSelect"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                >
+                  <option value="">Select existing customer</option>
+                  {customerOptions.map((customer: any) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} ({customer.id})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Or enter a customer ID manually</p>
+                <Input id="customerId" name="customerId" placeholder="customer-id" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="productId">
-                  Product ID (optional)
+                <label className="text-sm font-medium" htmlFor="productIdSelect">
+                  Product
                 </label>
+                <select
+                  id="productIdSelect"
+                  name="productIdSelect"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                >
+                  <option value="">Select existing product</option>
+                  {productOptions.map((product: any) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} ({product.sku})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Optional: or enter a product ID manually</p>
                 <Input id="productId" name="productId" placeholder="product-id" />
               </div>
               <div className="space-y-2">

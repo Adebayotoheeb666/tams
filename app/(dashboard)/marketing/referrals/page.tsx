@@ -2,12 +2,15 @@ import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { generateReferralCodeForCustomer, completeReferral, getReferrals } from "@/lib/actions/marketing";
+import { completeReferral, generateReferralCodeForCustomer, getCustomers, getReferrals } from "@/lib/actions/marketing";
+import { resolveCustomerId } from "@/lib/utils/customer-id";
 
 async function generateCodeAction(formData: FormData) {
   "use server";
 
-  await generateReferralCodeForCustomer(formData.get("customerId")?.toString() || "");
+  await generateReferralCodeForCustomer(
+    resolveCustomerId(formData.get("customerIdSelect")?.toString(), formData.get("customerId")?.toString()),
+  );
 }
 
 async function completeReferralAction(formData: FormData) {
@@ -17,8 +20,9 @@ async function completeReferralAction(formData: FormData) {
 }
 
 export default async function ReferralsPage() {
-  const result = await getReferrals();
-  const referrals = result.success ? result.data : [];
+  const [referralsResult, customersResult] = await Promise.all([getReferrals(), getCustomers()]);
+  const referrals = referralsResult.success ? referralsResult.data : [];
+  const customerOptions = customersResult.success ? customersResult.data : [];
   const completedReferrals = referrals.filter((r: any) => r.status === "completed").length;
   const totalRewards = referrals.reduce((sum: number, r: any) => sum + (Number(r.rewardGivenAmount || 0)), 0);
 
@@ -44,10 +48,23 @@ export default async function ReferralsPage() {
         <CardContent>
           <form action={generateCodeAction} className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium" htmlFor="customerId">
-                Customer ID
+              <label className="text-sm font-medium" htmlFor="customerIdSelect">
+                Customer
               </label>
-              <Input id="customerId" name="customerId" placeholder="customer-id" required />
+              <select
+                id="customerIdSelect"
+                name="customerIdSelect"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+              >
+                <option value="">Select existing customer</option>
+                {customerOptions.map((customer: any) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} ({customer.id})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">Or enter a customer ID manually</p>
+              <Input id="customerId" name="customerId" placeholder="customer-id" />
             </div>
             <Button type="submit">Generate code</Button>
           </form>
@@ -63,9 +80,9 @@ export default async function ReferralsPage() {
           <form action={completeReferralAction} className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="referralId">
-                Referral ID
+                Referral ID or code
               </label>
-              <Input id="referralId" name="referralId" placeholder="referral-id" required />
+              <Input id="referralId" name="referralId" placeholder="referral-id or referral code" required />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="rewardAmount">

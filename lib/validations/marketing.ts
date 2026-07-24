@@ -26,7 +26,13 @@ export const updateMarketingCampaignSchema = z.object({
 
 // Content Calendar
 export const createContentPostSchema = z.object({
-  campaignId: z.string().optional(),
+  campaignId: z.preprocess((value) => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : undefined;
+    }
+    return value;
+  }, z.string().optional()),
   platform: z.enum(["instagram", "tiktok", "youtube", "whatsapp", "email"]),
   contentType: z.enum([
     "product_showcase",
@@ -92,10 +98,18 @@ export const updateLeadStatusSchema = z.object({
   newStatus: z.enum(["new", "contacted", "interested", "converted", "lost", "nurturing"]),
 });
 
+const optionalStringId = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  }
+  return value;
+}, z.string().optional());
+
 // Testimonials
 export const submitTestimonialSchema = z.object({
-  customerId: z.string(),
-  productId: z.string().optional(),
+  customerId: z.string().min(1, "Customer ID is required"),
+  productId: optionalStringId,
   rating: z.number().min(1).max(5),
   textReview: z.string().optional(),
   imageUrl: z.string().optional(),
@@ -120,10 +134,19 @@ export const completeReferralSchema = z.object({
 
 // Broadcast
 export const createBroadcastSchema = z.object({
-  campaignId: z.string().optional(),
+  campaignId: optionalStringId,
   broadcastText: z.string().min(1, "Message is required"),
   broadcastImageUrl: z.string().optional(),
   recipientsSegment: z.enum(["vip", "repeat_customer", "new_customer", "inactive", "all"]),
+  scheduledDate: z.string().optional(),
+});
+
+export const updateBroadcastSchema = z.object({
+  id: z.string(),
+  campaignId: optionalStringId,
+  broadcastText: z.string().optional(),
+  broadcastImageUrl: z.string().optional(),
+  recipientsSegment: z.enum(["vip", "repeat_customer", "new_customer", "inactive", "all"]).optional(),
   scheduledDate: z.string().optional(),
 });
 

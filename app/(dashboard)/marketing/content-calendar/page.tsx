@@ -3,6 +3,7 @@ import { ContentForm } from "@/components/marketing/content-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSubmitButton } from "@/components/ui/loading-submit-button";
+import Link from "next/link";
 import { getContentCalendar, syncContentToBuffer, getBufferStats } from "@/lib/actions/marketing";
 
 async function syncContentBufferAction(formData: FormData) {
@@ -65,8 +66,17 @@ export default async function ContentCalendarPage() {
         {posts.map((post: any) => (
           <Card key={post.id}>
             <CardHeader>
-              <CardTitle>{post.title}</CardTitle>
-              <CardDescription>{post.platform} • {post.contentType}</CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle>{post.title}</CardTitle>
+                  <CardDescription>{post.platform} • {post.contentType}</CardDescription>
+                </div>
+                <Link href={`/marketing/content-calendar/${post.id}`}>
+                  <Button variant="outline" size="sm">
+                    Edit
+                  </Button>
+                </Link>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>Status: {post.status}</p>

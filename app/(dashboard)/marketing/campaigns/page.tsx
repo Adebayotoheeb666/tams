@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
 import { createMarketingCampaign, getCampaigns } from "@/lib/actions/marketing";
 
 async function createCampaignAction(formData: FormData) {
@@ -101,8 +102,17 @@ export default async function CampaignsPage() {
         {campaigns.map((campaign: any) => (
           <Card key={campaign.id}>
             <CardHeader>
-              <CardTitle>{campaign.name}</CardTitle>
-              <CardDescription>{campaign.description || "No description yet"}</CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle>{campaign.name}</CardTitle>
+                  <CardDescription>{campaign.description || "No description yet"}</CardDescription>
+                </div>
+                <Link href={`/marketing/campaigns/${campaign.id}`}>
+                  <Button variant="outline" size="sm">
+                    View
+                  </Button>
+                </Link>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>Status: {campaign.status}</p>

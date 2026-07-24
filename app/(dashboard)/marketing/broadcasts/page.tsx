@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   createBroadcast,
   getBroadcasts,
+  updateBroadcast,
+  deleteBroadcast,
   updateBroadcastDelivery,
   createBroadcastABTest,
   determineABTestWinner,
@@ -16,13 +18,21 @@ import {
 async function createBroadcastAction(formData: FormData) {
   "use server";
 
-  await createBroadcast({
+  const result = await createBroadcast({
     campaignId: formData.get("campaignId") || undefined,
     broadcastText: formData.get("broadcastText")?.toString() || "",
     broadcastImageUrl: formData.get("broadcastImageUrl") || undefined,
     recipientsSegment: (formData.get("recipientsSegment") as string) || "all",
     scheduledDate: formData.get("scheduledDate") || undefined,
   });
+
+  if (!result.success) {
+    console.error("Broadcast creation failed:", result.error, {
+      recipientsSegment: formData.get("recipientsSegment"),
+      scheduledDate: formData.get("scheduledDate"),
+    });
+    throw new Error(result.error || "Failed to create broadcast");
+  }
 }
 
 async function markBroadcastSentAction(formData: FormData) {
@@ -36,6 +46,31 @@ async function markBroadcastSentAction(formData: FormData) {
     sentCount: 1,
     sentDate: new Date().toISOString(),
   });
+}
+
+async function updateBroadcastAction(formData: FormData) {
+  "use server";
+
+  const broadcastId = formData.get("broadcastId")?.toString();
+  if (!broadcastId) return;
+
+  await updateBroadcast({
+    id: broadcastId,
+    campaignId: formData.get("campaignId")?.toString() || undefined,
+    broadcastText: formData.get("broadcastText")?.toString(),
+    broadcastImageUrl: formData.get("broadcastImageUrl")?.toString() || undefined,
+    recipientsSegment: formData.get("recipientsSegment")?.toString() as any,
+    scheduledDate: formData.get("scheduledDate")?.toString() || undefined,
+  });
+}
+
+async function deleteBroadcastAction(formData: FormData) {
+  "use server";
+
+  const broadcastId = formData.get("broadcastId")?.toString();
+  if (!broadcastId) return;
+
+  await deleteBroadcast(broadcastId);
 }
 
 async function createABTestAction(formData: FormData) {
@@ -219,8 +254,63 @@ export default async function BroadcastsPage() {
                       </div>
                     ) : null}
 
-                    <div className="flex gap-2">
-                      <form action={markBroadcastSentAction} className="flex-1">
+                    <form action={updateBroadcastAction} className="space-y-3">
+                      <input type="hidden" name="broadcastId" value={broadcast.id} />
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium" htmlFor={`broadcastText-${broadcast.id}`}>
+                          Update message
+                        </label>
+                        <Textarea
+                          id={`broadcastText-${broadcast.id}`}
+                          name="broadcastText"
+                          defaultValue={broadcast.broadcastText}
+                          className="min-h-[100px]"
+                        />
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium" htmlFor={`recipientsSegment-${broadcast.id}`}>
+                            Segment
+                          </label>
+                          <select
+                            id={`recipientsSegment-${broadcast.id}`}
+                            name="recipientsSegment"
+                            defaultValue={broadcast.recipientsSegment}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                          >
+                            <option value="vip">VIP</option>
+                            <option value="repeat_customer">Repeat customer</option>
+                            <option value="new_customer">New customer</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="all">All</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium" htmlFor={`scheduledDate-${broadcast.id}`}>
+                            Scheduled date
+                          </label>
+                          <Input
+                            id={`scheduledDate-${broadcast.id}`}
+                            name="scheduledDate"
+                            type="date"
+                            defaultValue={broadcast.scheduledDate || ""}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button type="submit" variant="outline" size="sm" className="w-full">
+                          Save changes
+                        </Button>
+                      </div>
+                    </form>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <form action={deleteBroadcastAction} className="w-full">
+                        <input type="hidden" name="broadcastId" value={broadcast.id} />
+                        <Button type="submit" variant="destructive" size="sm" className="w-full">
+                          Delete broadcast
+                        </Button>
+                      </form>
+                      <form action={markBroadcastSentAction} className="w-full">
                         <input type="hidden" name="broadcastId" value={broadcast.id} />
                         <Button type="submit" variant="outline" size="sm" className="w-full">
                           Mark as sent

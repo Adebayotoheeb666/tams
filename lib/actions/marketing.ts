@@ -13,19 +13,22 @@ import {
   marketingKpis,
   customers,
   orders,
+  products,
   socialPosts,
 } from "@/lib/db/schema";
-import { eq, desc, and, like, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, like, gte, lte, sql, or } from "drizzle-orm";
 import { auth } from "@/auth";
 import Sentiment from "sentiment";
 import {
   createMarketingCampaignSchema,
   updateMarketingCampaignSchema,
   createContentPostSchema,
+  updateContentPostSchema,
   createLeadSchema,
   updateLeadSchema,
   submitTestimonialSchema,
   createBroadcastSchema,
+  updateBroadcastSchema,
   addToBroadcastListSchema,
   updateKpiSchema,
 } from "@/lib/validations/marketing";
@@ -114,6 +117,90 @@ export async function updateCampaignStatus(campaignId: string, status: string) {
   }
 }
 
+export async function getCampaignById(campaignId: string) {
+  try {
+    const campaign = await db.query.marketingCampaigns.findFirst({
+      where: eq(marketingCampaigns.id, campaignId),
+    });
+
+    if (!campaign) {
+      return { error: "Campaign not found", success: false };
+    }
+
+    return {
+      success: true,
+      data: {
+        ...campaign,
+        targetPlatforms: typeof campaign.targetPlatforms === "string" ? JSON.parse(campaign.targetPlatforms) : campaign.targetPlatforms,
+      },
+    };
+  } catch (error) {
+    return { error: "Failed to fetch campaign", success: false };
+  }
+}
+
+export async function updateMarketingCampaign(input: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    const validated = updateMarketingCampaignSchema.parse(input);
+    const now = new Date().toISOString();
+    const updateData: Record<string, unknown> = { updatedAt: now };
+
+    if (validated.name !== undefined) updateData.name = validated.name;
+    if (validated.description !== undefined) updateData.description = validated.description || null;
+    if (validated.status) updateData.status = validated.status as any;
+    if (validated.startDate !== undefined) updateData.startDate = validated.startDate || null;
+    if (validated.endDate !== undefined) updateData.endDate = validated.endDate || null;
+    if (validated.targetPlatforms !== undefined) updateData.targetPlatforms = JSON.stringify(validated.targetPlatforms);
+    if (validated.goalDescription !== undefined) updateData.goalDescription = validated.goalDescription || null;
+    if (validated.budgetAllocation !== undefined) updateData.budgetAllocation = validated.budgetAllocation;
+
+    await db
+      .update(marketingCampaigns)
+      .set(updateData)
+      .where(eq(marketingCampaigns.id, validated.id));
+
+    revalidatePath("/marketing/campaigns");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return { error: error.issues[0]?.message || "Validation failed", success: false };
+    }
+    return { error: "Failed to update campaign", success: false };
+  }
+}
+
+export async function deleteMarketingCampaign(campaignId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    await db
+      .update(contentCalendar)
+      .set({ campaignId: null })
+      .where(eq(contentCalendar.campaignId, campaignId));
+
+    await db
+      .delete(marketingCampaigns)
+      .where(eq(marketingCampaigns.id, campaignId));
+
+    revalidatePath("/marketing/campaigns");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    return { error: "Failed to delete campaign", success: false };
+  }
+}
+
 // ============ CONTENT CALENDAR ============
 
 export async function createContentPost(input: unknown) {
@@ -130,9 +217,7 @@ export async function createContentPost(input: unknown) {
 
     const status = validated.scheduledDate ? "scheduled" : "draft";
 
-    const campaignId = validated.campaignId?.trim()
-      ? validated.campaignId.trim()
-      : null;
+    const campaignId = validated.campaignId ?? null;
     const hashtags = validated.hashtags && validated.hashtags.length > 0
       ? JSON.stringify(validated.hashtags)
       : null;
@@ -237,6 +322,82 @@ export async function updateContentStatus(postId: string, status: string) {
     return { success: true };
   } catch (error) {
     return { error: "Failed to update content status", success: false };
+  }
+}
+
+export async function getContentPostById(postId: string) {
+  try {
+    const post = await db.query.contentCalendar.findFirst({
+      where: eq(contentCalendar.id, postId),
+    });
+
+    if (!post) {
+      return { error: "Post not found", success: false };
+    }
+
+    return {
+      success: true,
+      data: {
+        ...post,
+        hashtags: typeof post.hashtags === "string" ? JSON.parse(post.hashtags || "[]") : [],
+      },
+    };
+  } catch (error) {
+    return { error: "Failed to fetch content post", success: false };
+  }
+}
+
+export async function updateContentPost(input: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    const validated = updateContentPostSchema.parse(input);
+    const now = new Date().toISOString();
+    const updateData: Record<string, unknown> = { updatedAt: now };
+
+    if (validated.title !== undefined) updateData.title = validated.title;
+    if (validated.caption !== undefined) updateData.caption = validated.caption || null;
+    if (validated.status) updateData.status = validated.status as any;
+    if (validated.scheduledDate !== undefined) updateData.scheduledDate = validated.scheduledDate || null;
+    if (validated.hashtags !== undefined) updateData.hashtags = JSON.stringify(validated.hashtags);
+
+    await db
+      .update(contentCalendar)
+      .set(updateData)
+      .where(eq(contentCalendar.id, validated.id));
+
+    revalidatePath("/marketing/content-calendar");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return { error: error.issues[0]?.message || "Validation failed", success: false };
+    }
+    return { error: "Failed to update content post", success: false };
+  }
+}
+
+export async function deleteContentPost(postId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    await db
+      .delete(contentCalendar)
+      .where(eq(contentCalendar.id, postId));
+
+    revalidatePath("/marketing/content-calendar");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    return { error: "Failed to delete content post", success: false };
   }
 }
 
@@ -360,6 +521,24 @@ export async function updateLead(input: unknown) {
       return { error: error.issues[0]?.message || "Validation failed", success: false };
     }
     return { error: "Failed to update lead", success: false };
+  }
+}
+
+export async function deleteLead(leadId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    await db.delete(leads).where(eq(leads.id, leadId));
+
+    revalidatePath("/marketing/leads");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    return { error: "Failed to delete lead", success: false };
   }
 }
 
@@ -597,6 +776,11 @@ export async function getBroadcastList(segment?: string) {
 
 export async function generateReferralCodeForCustomer(customerId: string) {
   try {
+    const trimmedCustomerId = customerId?.trim();
+    if (!trimmedCustomerId) {
+      return { error: "Please select or enter a customer ID", success: false };
+    }
+
     const session = await auth();
     if (!session?.user?.id) {
       return { error: "Unauthorized", success: false };
@@ -611,12 +795,12 @@ export async function generateReferralCodeForCustomer(customerId: string) {
     }
 
     const id = crypto.randomUUID();
-    const code = generateCode(customerId);
+    const code = generateCode(trimmedCustomerId);
     const now = new Date().toISOString();
 
     await db.insert(referralProgram).values({
       id,
-      referrerCustomerId: customerId,
+      referrerCustomerId: trimmedCustomerId,
       referralCode: code,
       status: "pending",
       referralDate: now,
@@ -707,6 +891,8 @@ export async function createBroadcast(input: unknown) {
     if (error instanceof ZodError) {
       return { error: error.issues[0]?.message || "Validation failed", success: false };
     }
+
+    console.error("Failed to create broadcast:", error, { input });
     return { error: "Failed to create broadcast", success: false };
   }
 }
@@ -732,6 +918,33 @@ export async function getBroadcasts() {
     };
   } catch (error) {
     return { error: "Failed to fetch broadcasts", success: false, data: [] };
+  }
+}
+
+export async function getCustomers() {
+  try {
+    const customerRows = await db
+      .select({ id: customers.id, name: customers.name })
+      .from(customers)
+      .orderBy(desc(customers.createdAt));
+
+    return { success: true, data: customerRows };
+  } catch (error) {
+    return { error: "Failed to fetch customers", success: false, data: [] };
+  }
+}
+
+export async function getProducts() {
+  try {
+    const productRows = await db
+      .select({ id: products.id, name: products.name, sku: products.sku })
+      .from(products)
+      .where(eq(products.isActive, 1))
+      .orderBy(desc(products.updatedAt));
+
+    return { success: true, data: productRows };
+  } catch (error) {
+    return { error: "Failed to fetch products", success: false, data: [] };
   }
 }
 
@@ -776,6 +989,67 @@ export async function updateBroadcastDelivery(
     return { success: true };
   } catch (error) {
     return { error: "Failed to update broadcast delivery", success: false };
+  }
+}
+
+export async function updateBroadcast(input: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    const validated = updateBroadcastSchema.parse(input);
+    const now = new Date().toISOString();
+    const updateData: Record<string, unknown> = { updatedAt: now };
+
+    if (validated.campaignId !== undefined) {
+      updateData.campaignId = validated.campaignId || null;
+    }
+    if (validated.broadcastText !== undefined) {
+      updateData.broadcastText = validated.broadcastText;
+    }
+    if (validated.broadcastImageUrl !== undefined) {
+      updateData.broadcastImageUrl = validated.broadcastImageUrl || null;
+    }
+    if (validated.recipientsSegment !== undefined) {
+      updateData.recipientsSegment = validated.recipientsSegment;
+    }
+    if (validated.scheduledDate !== undefined) {
+      updateData.scheduledDate = validated.scheduledDate || null;
+    }
+
+    await db.update(whatsappBroadcasts).set(updateData as any).where(eq(whatsappBroadcasts.id, validated.id));
+
+    revalidatePath("/marketing/broadcasts");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return { error: error.issues[0]?.message || "Validation failed", success: false };
+    }
+    console.error("Failed to update broadcast:", error, { input });
+    return { error: "Failed to update broadcast", success: false };
+  }
+}
+
+export async function deleteBroadcast(broadcastId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { error: "Unauthorized", success: false };
+    }
+
+    await db.delete(whatsappBroadcasts).where(eq(whatsappBroadcasts.id, broadcastId));
+
+    revalidatePath("/marketing/broadcasts");
+    revalidatePath("/marketing");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete broadcast:", error);
+    return { error: "Failed to delete broadcast", success: false };
   }
 }
 
@@ -943,6 +1217,19 @@ export async function completeReferral(referralId: string, rewardAmount: number)
       return { error: "Unauthorized", success: false };
     }
 
+    const trimmedReferralId = referralId?.trim();
+    if (!trimmedReferralId) {
+      return { error: "Please enter a referral ID or referral code", success: false };
+    }
+
+    const referral = await db.query.referralProgram.findFirst({
+      where: or(eq(referralProgram.id, trimmedReferralId), eq(referralProgram.referralCode, trimmedReferralId)),
+    });
+
+    if (!referral) {
+      return { error: "Referral not found. Enter the referral ID or code shown on the referral card.", success: false };
+    }
+
     const now = new Date().toISOString();
 
     await db
@@ -954,10 +1241,14 @@ export async function completeReferral(referralId: string, rewardAmount: number)
         conversionDate: now,
         updatedAt: now,
       })
-      .where(eq(referralProgram.id, referralId));
+      .where(eq(referralProgram.id, referral.id));
 
-    return { success: true };
+    revalidatePath("/marketing/referrals");
+    revalidatePath("/marketing");
+
+    return { success: true, data: { id: referral.id } };
   } catch (error) {
+    console.error("Failed to complete referral:", error);
     return { error: "Failed to complete referral", success: false };
   }
 }
@@ -1298,7 +1589,7 @@ export async function analyzeSentiment(text: string) {
 
 export async function submitTestimonialWithSentiment(
   customerId: string,
-  productId: string,
+  productId: string | undefined,
   rating: number,
   textReview: string,
   platformShared: string,
@@ -1321,7 +1612,7 @@ export async function submitTestimonialWithSentiment(
     await db.insert(customerTestimonials).values({
       id: testimonialId,
       customerId,
-      productId,
+      productId: productId || null,
       rating,
       textReview,
       imageUrl: imageUrl || null,
@@ -1382,6 +1673,7 @@ export async function createBroadcastABTest(
       return { error: "Unauthorized", success: false };
     }
 
+    const normalizedCampaignId = campaignId?.trim() ? campaignId : null;
     const now = new Date().toISOString();
     const parentId = crypto.randomUUID();
     const variantAId = crypto.randomUUID();
@@ -1401,7 +1693,7 @@ export async function createBroadcastABTest(
     // Create parent broadcast (tracks winner)
     await db.insert(whatsappBroadcasts).values({
       id: parentId,
-      campaignId,
+      campaignId: normalizedCampaignId,
       broadcastText: `A/B Test: A vs B`,
       recipientsSegment: recipientsSegment as any,
       totalRecipients: halfSize * 2,
@@ -1416,7 +1708,7 @@ export async function createBroadcastABTest(
     // Create variant A
     await db.insert(whatsappBroadcasts).values({
       id: variantAId,
-      campaignId,
+      campaignId: normalizedCampaignId,
       broadcastText: textA,
       recipientsSegment: recipientsSegment as any,
       totalRecipients,
@@ -1433,7 +1725,7 @@ export async function createBroadcastABTest(
     // Create variant B
     await db.insert(whatsappBroadcasts).values({
       id: variantBId,
-      campaignId,
+      campaignId: normalizedCampaignId,
       broadcastText: textB,
       recipientsSegment: recipientsSegment as any,
       totalRecipients,

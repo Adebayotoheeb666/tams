@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { getLeadById, updateLead, convertLeadToCustomerRecord } from "@/lib/actions/marketing";
+import { getLeadById, updateLead, deleteLead, convertLeadToCustomerRecord } from "@/lib/actions/marketing";
 import { redirect, notFound } from "next/navigation";
 import { format } from "date-fns";
 
@@ -33,6 +33,16 @@ async function convertLeadAction(formData: FormData) {
 
   await convertLeadToCustomerRecord(leadId);
   redirect(`/marketing/leads/${leadId}`);
+}
+
+async function deleteLeadAction(formData: FormData) {
+  "use server";
+
+  const leadId = formData.get("leadId")?.toString();
+  if (!leadId) return;
+
+  await deleteLead(leadId);
+  redirect("/marketing/leads");
 }
 
 function getStatusBadge(status: string) {
@@ -153,7 +163,23 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
             )}
           </CardContent>
         </Card>
-      </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Delete lead</CardTitle>
+              <CardDescription>Remove this lead record if it is no longer needed.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={deleteLeadAction} className="space-y-4">
+                <input type="hidden" name="leadId" value={lead.id} />
+                <p className="text-sm text-muted-foreground">
+                  Deleting a lead removes it permanently. Use this only for invalid or duplicate entries.
+                </p>
+                <Button type="submit" variant="destructive">Delete lead</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
     </MarketingPageShell>
   );
 }

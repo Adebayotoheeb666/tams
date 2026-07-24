@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeContentPostInput } from "../../lib/utils/marketing/content-calendar";
+import { createContentPostSchema } from "../../lib/validations/marketing";
 
 describe("content calendar input normalization", () => {
   it("stores uploaded media as a database-safe content reference", async () => {
@@ -19,5 +20,17 @@ describe("content calendar input normalization", () => {
     });
 
     expect(result.contentUrl).toContain("data:image/png;base64,");
+  });
+
+  it("normalizes empty campaignId values to undefined", () => {
+    const validated = createContentPostSchema.parse({
+      campaignId: "  ",
+      platform: "instagram",
+      contentType: "behind_the_scenes",
+      title: "Behind the scenes: new nail set",
+      contentUrl: "https://example.com/sample.png",
+    });
+
+    expect(validated.campaignId).toBeUndefined();
   });
 });

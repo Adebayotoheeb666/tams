@@ -32,24 +32,40 @@ export const TRIGGER_EVENTS = {
   CUSTOMERS_JOURNEYS_SYNC: "customers.journeys.sync",
 } as const;
 
-const triggerApiUrl = process.env.TRIGGER_API_URL ?? "https://api.trigger.dev/v1/runs";
+const triggerApiBaseUrl = (() => {
+  const rawUrl = process.env.TRIGGER_API_URL?.trim() || "https://cloud.trigger.dev";
+  let normalizedUrl = rawUrl.replace(/\/+$/, "");
 
-async function triggerRequest(body: Record<string, unknown>) {
+  if (normalizedUrl.endsWith("/api/v1/runs")) {
+    normalizedUrl = normalizedUrl.slice(0, -"/api/v1/runs".length);
+  } else if (normalizedUrl.endsWith("/api/v1")) {
+    normalizedUrl = normalizedUrl.slice(0, -"/api/v1".length);
+  }
+
+  return normalizedUrl;
+})();
+
+async function triggerRequest(taskId: string, payload: Record<string, unknown>) {
   const key = process.env.TRIGGER_API_KEY;
   if (!key) throw new Error("TRIGGER_API_KEY not configured");
 
-  const res = await fetch(triggerApiUrl, {
+  const url = new URL(`/api/v1/tasks/${encodeURIComponent(taskId)}/trigger`, triggerApiBaseUrl).toString();
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      payload,
+      context: {},
+    }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Trigger API error: ${text}`);
+    throw new Error(`Trigger API error: ${res.status} ${text}`);
   }
 
   return await res.json();
@@ -57,16 +73,10 @@ async function triggerRequest(body: Record<string, unknown>) {
 
 export const triggerClient = {
   async runExport(jobId: string) {
-    return await triggerRequest({
-      name: TRIGGER_EVENTS.EXPORTS_STATEMENTS_GENERATE,
-      input: { jobId },
-    });
+    return await triggerRequest(TRIGGER_EVENTS.EXPORTS_STATEMENTS_GENERATE, { jobId });
   },
 
   async triggerEvent(name: string, payload: Record<string, unknown>) {
-    return await triggerRequest({
-      name,
-      input: payload,
-    });
+    return await triggerRequest(name, payload);
   },
 };
